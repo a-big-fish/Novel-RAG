@@ -1,0 +1,33 @@
+[project]
+name = "novel-rag"
+version = "0.1.0"
+description = "Independent upper-pipeline RAG service for novel writing references"
+requires-python = ">=3.11"
+dependencies = [
+    "beautifulsoup4>=4.12",
+    "ebooklib>=0.19",
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "jieba>=0.42.1",
+    "lxml>=5.0",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.5",
+    "qdrant-client>=1.15,<2",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: tests requiring external PostgreSQL, Qdrant, or Ollama",
+]
