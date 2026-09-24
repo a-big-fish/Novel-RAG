@@ -14,6 +14,7 @@ from app.db.postgres import PostgresRepository
 from app.db.qdrant import QdrantAdapter
 from app.services.annotator import Annotator
 from app.services.embedder import Embedder
+from app.services.reference_evaluator import ReferenceEvaluator
 from app.services.sparse import build_sparse_vector, collect_doc_frequencies
 from app.services.splitter import split_chapters_into_scenes
 from app.services.tagger import TagVocabulary
@@ -201,6 +202,12 @@ class Indexer:
                     "char_count": scene.char_count,
                     "split_reason": scene.split_reason,
                     "is_cross_chapter": scene.is_cross_chapter,
+                    "reference_status": "unevaluated",
+                    "reference_score": 0.0,
+                    "reference_reason": "",
+                    "reference_prompt_version": "",
+                    "reference_rule_version": "",
+                    "reference_meta_json": {},
                     "annotate_status": "pending",
                     "index_status": "pending",
                     "is_active": False,
@@ -228,6 +235,12 @@ class Indexer:
         )
         points: list[dict[str, Any]] = []
         for scene in scene_rows:
+            if scene.get("reference_status") != "selected":
+                raise NovelRagError(
+                    "cannot embed scene not selected as a writing reference: "
+                    f"scene_id={scene.get('id')}, "
+                    f"status={scene.get('reference_status')}"
+                )
             if scene.get("annotate_status") != "annotated":
                 raise NovelRagError(
                     "cannot embed scene without successful annotation: "
@@ -250,6 +263,12 @@ class Indexer:
                         "scene_index_in_book": int(scene["scene_index_in_book"]),
                         "chapter_start_index": int(scene["chapter_start_index"]),
                         "chapter_end_index": int(scene["chapter_end_index"]),
+                        "reference_status": scene["reference_status"],
+                        "reference_score": float(scene["reference_score"]),
+                        "reference_reason": scene["reference_reason"],
+                        "reference_rule_version": scene[
+                            "reference_rule_version"
+                        ],
                         "summary": scene["summary"],
                         "style_summary": scene["style_summary"],
                         "usage_hint": scene["usage_hint"],
@@ -316,6 +335,30 @@ class Indexer:
                 lambda: self._split_and_store(book_id, version, txt_path),
             )
 
+            self.repository.update_book(book_id, status="evaluating")
+            evaluator = ReferenceEvaluator(
+                repository=self.repository,
+                llm_client=self.llm_client,
+                settings=self.settings,
+            )
+            evaluation_stats = self._run_job(
+                book_id,
+                "evaluate",
+                lambda: evaluator.evaluate_book(book_id, version),
+                total_items=len(scene_rows),
+            )
+            self.repository.update_book(
+                book_id,
+                selected_scenes=evaluation_stats["selected"],
+                archived_scenes=evaluation_stats["archived"],
+                evaluation_failed_scenes=evaluation_stats["evaluation_failed"],
+            )
+            if evaluation_stats["evaluation_failed"]:
+                raise NovelRagError(
+                    "reference evaluation failed for "
+                    f"{evaluation_stats['evaluation_failed']} scene(s)"
+                )
+
             self.repository.update_book(book_id, status="annotating")
             self.repository.upsert_tag_vocab(self.vocabulary.rows)
             annotator = Annotator(
@@ -328,17 +371,22 @@ class Indexer:
                 book_id,
                 "annotate",
                 lambda: annotator.annotate_book(book_id, version),
-                total_items=len(scene_rows),
+                total_items=evaluation_stats["selected"],
             )
 
             self.repository.update_book(book_id, status="indexing")
-            annotated_rows = [
+            all_scene_rows = [
                 dict(row)
                 for row in self.repository.list_scenes(book_id, version)
             ]
+            selected_rows = [
+                row
+                for row in all_scene_rows
+                if row["reference_status"] == "selected"
+            ]
             failed_annotations = [
                 int(row["id"])
-                for row in annotated_rows
+                for row in selected_rows
                 if row["annotate_status"] != "annotated"
             ]
             if failed_annotations:
@@ -352,43 +400,57 @@ class Indexer:
                 lambda: self._build_points(
                     book_id=book_id,
                     version=version,
-                    scene_rows=annotated_rows,
+                    scene_rows=selected_rows,
                 ),
-                total_items=len(annotated_rows),
+                total_items=len(selected_rows),
             )
             collection_name = self.qdrant.create_scenes_collection(
                 book_id,
                 version,
             )
             self.qdrant.upsert_scene_points(collection_name, points)
-            for scene in annotated_rows:
+            for scene in selected_rows:
                 self.repository.update_scene(
                     int(scene["id"]),
                     index_status="indexed",
                     error_message=None,
                 )
 
-            pg_count = len(
-                self.repository.list_scenes(book_id, version)
+            indexed_selected_count = len(
+                self.repository.list_scenes(
+                    book_id,
+                    version,
+                    reference_status="selected",
+                    annotate_status="annotated",
+                    index_status="indexed",
+                )
             )
             qdrant_count = self.qdrant.count(collection_name)
-            if pg_count != qdrant_count:
+            if indexed_selected_count != qdrant_count:
                 raise NovelRagError(
                     "index consistency check failed: "
-                    f"postgres={pg_count}, qdrant={qdrant_count}"
+                    f"selected_indexed={indexed_selected_count}, "
+                    f"qdrant={qdrant_count}, total_scenes={len(all_scene_rows)}"
                 )
             self._run_job(
                 book_id,
                 "sync",
                 lambda: self.repository.activate_version(book_id, version),
-                total_items=pg_count,
+                total_items=indexed_selected_count,
             )
             return {
                 "book_id": book_id,
                 "version": version,
                 "collection": collection_name,
                 "chapters": len(split_chapters(txt_path.read_text(encoding="utf-8"))),
-                "scenes": pg_count,
+                "scenes": len(all_scene_rows),
+                "selected_scenes": evaluation_stats["selected"],
+                "archived_scenes": evaluation_stats["archived"],
+                "evaluation_failed_scenes": evaluation_stats[
+                    "evaluation_failed"
+                ],
+                "indexed_scenes": indexed_selected_count,
+                "reference_evaluation": evaluation_stats,
                 "annotation": annotation_stats,
             }
         except Exception as exc:

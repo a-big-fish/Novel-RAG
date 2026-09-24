@@ -28,6 +28,32 @@ def test_split_chapters_is_one_based() -> None:
     assert chapters[2].start_paragraph_index >= chapters[1].end_paragraph_index
 
 
+def test_split_chapters_accepts_markdown_headings_and_epilogue() -> None:
+    text = """# 书名
+
+## 上部
+
+### 第一章 雪夜
+
+正文一。
+
+### 第二章 重逢
+
+正文二。
+
+### 尾声 月光
+
+正文三。
+"""
+    chapters = split_chapters(text)
+
+    assert [chapter.title for chapter in chapters] == [
+        "第一章 雪夜",
+        "第二章 重逢",
+        "尾声 月光",
+    ]
+
+
 def test_split_paragraphs() -> None:
     assert split_paragraphs("a\n\n b \n\n\n c") == ["a", "b", "c"]
 

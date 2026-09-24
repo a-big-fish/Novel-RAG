@@ -132,12 +132,13 @@ def start_index(
     book = repository.get_book(book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="book not found")
-    if book["status"] == "ready":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="book is already indexed; rebuild is not enabled in this version",
-        )
-    if book["status"] in {"converting", "splitting", "annotating", "indexing"}:
+    if book["status"] in {
+        "converting",
+        "splitting",
+        "evaluating",
+        "annotating",
+        "indexing",
+    }:
         return StartIndexResponse(
             book_id=book_id,
             status=str(book["status"]),

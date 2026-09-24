@@ -1,8 +1,32 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ReferenceDimensions(BaseModel):
+    """Auditable dimensions used by the lightweight reference evaluator."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    prose_quality: float = Field(ge=0.0, le=5.0)
+    technique_value: float = Field(ge=0.0, le=5.0)
+    scene_completeness: float = Field(ge=0.0, le=5.0)
+    context_independence: float = Field(ge=0.0, le=5.0)
+    distinctiveness: float = Field(ge=0.0, le=5.0)
+    reference_value: float = Field(ge=0.0, le=5.0)
+
+
+class ReferenceEvaluation(BaseModel):
+    """Validated admission decision for one final scene."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reference_status: Literal["selected", "archived"]
+    reference_score: float = Field(ge=0.0, le=5.0)
+    reference_reason: str = Field(min_length=1, max_length=1000)
+    dimensions: ReferenceDimensions
 
 
 class SceneAnnotation(BaseModel):

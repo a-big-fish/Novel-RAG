@@ -42,6 +42,11 @@ class Annotator:
         """Annotate one scene and return its final status."""
 
         scene_id = int(scene["id"])
+        if scene.get("reference_status") != "selected":
+            raise ValueError(
+                "deep annotation requires reference_status=selected: "
+                f"scene_id={scene_id}"
+            )
         final_text = self._bounded_scene_text(str(scene["text"]))
         input_hash = self.repository.annotation_cache_key(
             model=self.llm_client.model,
@@ -122,6 +127,7 @@ class Annotator:
             book_id,
             version,
             annotate_status="pending",
+            reference_status="selected",
         )
         if limit is not None:
             rows = rows[:limit]

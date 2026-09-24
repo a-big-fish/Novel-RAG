@@ -64,7 +64,29 @@ def test_build_points_rejects_unannotated_scene() -> None:
                 {
                     "id": 10,
                     "text": "雨落在旧城的屋檐上。",
+                    "reference_status": "selected",
                     "annotate_status": "failed_permanent",
+                }
+            ],
+        )
+
+    assert repository.embedding_cache_written is False
+
+
+def test_build_points_rejects_archived_scene() -> None:
+    repository = FakeRepository()
+    indexer = _indexer(repository, Settings(_env_file=None))
+
+    with pytest.raises(NovelRagError, match="not selected"):
+        indexer._build_points(
+            book_id=1,
+            version=1,
+            scene_rows=[
+                {
+                    "id": 11,
+                    "text": "他们离开房间，去往下一处地点。",
+                    "reference_status": "archived",
+                    "annotate_status": "not_applicable",
                 }
             ],
         )

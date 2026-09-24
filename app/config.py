@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    app_version: str = "0.6.0"
+    app_version: str = "0.7.0"
     api_prefix: str = "/api/v1"
 
     book_source_dir: Path = Path("E:/novels/tool")
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     postgres_db: str = "novel_rag"
     postgres_user: str = "admin"
     postgres_password: SecretStr = SecretStr("")
-    postgres_test_db: str = "novel_rag_test"
+    postgres_test_db: str = "novel-rag-test-2"
 
     qdrant_url: str = "http://172.16.43.125:6333"
     qdrant_api_key: SecretStr | None = None
@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = SecretStr("")
     llm_model: str = ""
     llm_timeout_seconds: float = 180.0
+    llm_max_retries: int = 2
+    llm_retry_backoff_seconds: float = 1.0
 
     codex_exec_path: str = "codex"
     codex_exec_timeout_seconds: int = 1800
@@ -66,6 +68,7 @@ class Settings(BaseSettings):
     embed_concurrency: int = 3
 
     tag_vocab_version: str = "v1"
+    reference_rule_version: str = "v1"
     prompt_version: str = "v1.0"
     log_level: str = "INFO"
 

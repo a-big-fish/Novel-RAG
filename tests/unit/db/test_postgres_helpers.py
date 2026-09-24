@@ -19,3 +19,20 @@ def test_embedding_cache_key_changes_with_model() -> None:
     first = PostgresRepository.embedding_cache_key(model="a", input_text="x")
     second = PostgresRepository.embedding_cache_key(model="b", input_text="x")
     assert first != second
+
+
+def test_reference_cache_key_changes_with_rule_version() -> None:
+    common = {
+        "model": "model-a",
+        "prompt_version": "v1",
+        "input_text": "scene",
+    }
+    first = PostgresRepository.reference_evaluation_cache_key(
+        **common,
+        rule_version="v1",
+    )
+    second = PostgresRepository.reference_evaluation_cache_key(
+        **common,
+        rule_version="v2",
+    )
+    assert first != second

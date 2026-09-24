@@ -12,17 +12,19 @@ from app.db.models import (
     chapters,
     embedding_cache,
     index_jobs,
+    reference_evaluation_cache,
     scenes,
     tag_vocab,
     token_map,
 )
 from app.db.postgres import PostgresDatabase, PostgresRepository
+from tests.integration.support import build_test_database
 
 pytestmark = pytest.mark.integration
 
 
 def test_postgres_repository_round_trip() -> None:
-    database = PostgresDatabase.from_settings(test=True)
+    database = build_test_database()
     repository = PostgresRepository(database)
     marker = uuid.uuid4().hex
     source_sha = hashlib.sha256(marker.encode()).hexdigest()
@@ -106,6 +108,54 @@ def test_postgres_repository_round_trip() -> None:
             scene_ids[0],
             summary="摘要",
             annotate_status="annotated",
+            index_status="indexed",
+            error_message="旧错误",
+        )
+        repository.upsert_scenes(
+            book_id,
+            1,
+            [
+                {
+                    "scene_index_in_book": 1,
+                    "chapter_start_index": 1,
+                    "chapter_end_index": 1,
+                    "text": "再次重试的正文。",
+                    "char_count": 7,
+                    "split_reason": "rule",
+                    "is_cross_chapter": False,
+                    "annotate_status": "pending",
+                    "index_status": "pending",
+                    "is_active": False,
+                }
+            ],
+        )
+        retried_scene = repository.list_scenes(book_id, 1)[0]
+        assert retried_scene["annotate_status"] == "pending"
+        assert retried_scene["index_status"] == "pending"
+        assert retried_scene["error_message"] is None
+        assert retried_scene["summary"] == ""
+        assert retried_scene["reference_status"] == "unevaluated"
+
+        reference_key = repository.reference_evaluation_cache_key(
+            model="test-model",
+            prompt_version="v1",
+            rule_version="v1",
+            input_text="测试正文。",
+        )
+        repository.put_reference_evaluation_cache(
+            input_hash=reference_key,
+            model="test-model",
+            prompt_version="v1",
+            rule_version="v1",
+            input_text="测试正文。",
+            output_json={"reference_status": "selected"},
+        )
+        assert repository.get_reference_evaluation_cache(reference_key) is not None
+
+        repository.update_scene(
+            scene_ids[0],
+            summary="摘要",
+            annotate_status="annotated",
         )
         repository.activate_version(book_id, 1)
         assert repository.active_scene_count(book_id, 1) == 1
@@ -174,6 +224,7 @@ def test_postgres_repository_round_trip() -> None:
             with database.engine.begin() as connection:
                 for table in (
                     annotation_cache,
+                    reference_evaluation_cache,
                     embedding_cache,
                     index_jobs,
                     token_map,
@@ -183,7 +234,11 @@ def test_postgres_repository_round_trip() -> None:
                 ):
                     if table is books:
                         connection.execute(delete(table).where(table.c.id == book_id))
-                    elif table is annotation_cache or table is embedding_cache:
+                    elif table in {
+                        annotation_cache,
+                        reference_evaluation_cache,
+                        embedding_cache,
+                    }:
                         continue
                     else:
                         connection.execute(
@@ -192,6 +247,21 @@ def test_postgres_repository_round_trip() -> None:
                 connection.execute(
                     delete(tag_vocab).where(
                         tag_vocab.c.canonical_key == f"test_{marker[:8]}"
+                    )
+                )
+                connection.execute(
+                    delete(reference_evaluation_cache).where(
+                        reference_evaluation_cache.c.model == "test-model"
+                    )
+                )
+                connection.execute(
+                    delete(annotation_cache).where(
+                        annotation_cache.c.model == "test-model"
+                    )
+                )
+                connection.execute(
+                    delete(embedding_cache).where(
+                        embedding_cache.c.model == "test-model"
                     )
                 )
         database.dispose()

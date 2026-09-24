@@ -39,7 +39,7 @@ class FakeRepository:
         initial_status: str = "converting",
     ) -> bool:
         book = self.books.get(book_id)
-        if not book or book["status"] not in {"pending", "failed"}:
+        if not book or book["status"] not in {"pending", "failed", "ready"}:
             return False
         book["status"] = initial_status
         return True
@@ -226,20 +226,30 @@ def test_start_index_does_not_duplicate_running_job() -> None:
     }
 
 
-def test_start_index_rejects_ready_book() -> None:
+def test_start_index_rebuilds_ready_book_into_new_version() -> None:
     repository = FakeRepository()
     repository.books[10] = _book(
         book_id=10,
         source_format="txt",
         status="ready",
     )
+    created: list[FakeIndexer] = []
+
+    def factory(repo: FakeRepository) -> FakeIndexer:
+        indexer = FakeIndexer(repo)
+        created.append(indexer)
+        return indexer
+
     app.dependency_overrides[get_repository] = lambda: repository
+    app.dependency_overrides[get_indexer_factory] = lambda: factory
     try:
         response = TestClient(app).post("/api/v1/books/10/index")
     finally:
         app.dependency_overrides.clear()
 
-    assert response.status_code == 409
+    assert response.status_code == 202
+    assert response.json()["index_started"] is True
+    assert created[0].ran is True
 
 
 def test_postgres_direct_query_endpoints() -> None:

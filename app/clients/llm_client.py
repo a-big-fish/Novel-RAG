@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import time
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -92,6 +93,11 @@ class OpenAICompatibleClient(JsonLLMClient):
         if not self.model:
             raise ValueError("LLM_MODEL is not configured")
         self._owns_client = client is None
+        self.max_retries = max(0, self.settings.llm_max_retries)
+        self.retry_backoff_seconds = max(
+            0.0,
+            self.settings.llm_retry_backoff_seconds,
+        )
         self.client = client or httpx.Client(
             timeout=timeout_seconds or self.settings.llm_timeout_seconds
         )
@@ -122,17 +128,34 @@ class OpenAICompatibleClient(JsonLLMClient):
             ],
             "temperature": 0.2,
         }
+        response: httpx.Response | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = self.client.post(
+                    self._chat_endpoint(),
+                    headers=headers,
+                    json=payload,
+                )
+                response.raise_for_status()
+                break
+            except httpx.HTTPStatusError as exc:
+                status_code = exc.response.status_code
+                retryable = status_code in {408, 429} or status_code >= 500
+                if not retryable or attempt >= self.max_retries:
+                    raise StorageError(f"LLM request failed: {exc}") from exc
+            except httpx.TransportError as exc:
+                if attempt >= self.max_retries:
+                    raise StorageError(f"LLM request failed: {exc}") from exc
+            if self.retry_backoff_seconds:
+                time.sleep(self.retry_backoff_seconds * (2**attempt))
+
+        if response is None:  # pragma: no cover - defensive invariant
+            raise StorageError("LLM request failed without a response")
         try:
-            response = self.client.post(
-                self._chat_endpoint(),
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
             body = response.json()
             content = body["choices"][0]["message"]["content"]
         except Exception as exc:
-            raise StorageError(f"LLM request failed: {exc}") from exc
+            raise StorageError(f"LLM response parsing failed: {exc}") from exc
         if not isinstance(content, str):
             raise StorageError("LLM returned a non-text response")
         return extract_json_object(content)

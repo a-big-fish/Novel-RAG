@@ -76,6 +76,7 @@ def test_annotate_scene_writes_mapped_fields() -> None:
             "text": "测试正文",
             "chapter_start_index": 1,
             "chapter_end_index": 1,
+            "reference_status": "selected",
         }
     )
     assert status == "annotated"
@@ -98,6 +99,7 @@ def test_annotate_scene_uses_cache() -> None:
         "text": "测试正文",
         "chapter_start_index": 1,
         "chapter_end_index": 1,
+        "reference_status": "selected",
     }
     scene_annotation = FakeLLM().request_typed()
     repository.cache["key-测试正文"] = {

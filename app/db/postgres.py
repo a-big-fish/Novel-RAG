@@ -17,6 +17,7 @@ from app.db.models import (
     chapters,
     embedding_cache,
     index_jobs,
+    reference_evaluation_cache,
     scenes,
     tag_vocab,
     token_map,
@@ -148,7 +149,7 @@ class PostgresRepository:
                 update(books)
                 .where(
                     books.c.id == book_id,
-                    books.c.status.in_(("pending", "failed")),
+                    books.c.status.in_(("pending", "failed", "ready")),
                 )
                 .values(
                     status=initial_status,
@@ -214,6 +215,31 @@ class PostgresRepository:
                 "char_count": statement.excluded.char_count,
                 "split_reason": statement.excluded.split_reason,
                 "is_cross_chapter": statement.excluded.is_cross_chapter,
+                "reference_status": statement.excluded.reference_status,
+                "reference_score": statement.excluded.reference_score,
+                "reference_reason": statement.excluded.reference_reason,
+                "reference_prompt_version": statement.excluded.reference_prompt_version,
+                "reference_rule_version": statement.excluded.reference_rule_version,
+                "reference_meta_json": statement.excluded.reference_meta_json,
+                "summary": statement.excluded.summary,
+                "style_summary": statement.excluded.style_summary,
+                "usage_hint": statement.excluded.usage_hint,
+                "scene_type": statement.excluded.scene_type,
+                "scene_type_display": statement.excluded.scene_type_display,
+                "technique": statement.excluded.technique,
+                "technique_display": statement.excluded.technique_display,
+                "style_tags": statement.excluded.style_tags,
+                "style_tags_display": statement.excluded.style_tags_display,
+                "emotion_tags": statement.excluded.emotion_tags,
+                "emotion_tags_display": statement.excluded.emotion_tags_display,
+                "key_images": statement.excluded.key_images,
+                "key_images_display": statement.excluded.key_images_display,
+                "narrative_func": statement.excluded.narrative_func,
+                "meta_json": statement.excluded.meta_json,
+                "annotate_status": statement.excluded.annotate_status,
+                "index_status": statement.excluded.index_status,
+                "error_message": statement.excluded.error_message,
+                "is_active": statement.excluded.is_active,
                 "updated_at": _utc_now(),
             },
         ).returning(scenes.c.id, scenes.c.scene_index_in_book)
@@ -245,6 +271,7 @@ class PostgresRepository:
         *,
         annotate_status: str | None = None,
         index_status: str | None = None,
+        reference_status: str | None = None,
         active_only: bool = False,
     ) -> list[Mapping[str, Any]]:
         statement = select(scenes).where(
@@ -255,6 +282,10 @@ class PostgresRepository:
             statement = statement.where(scenes.c.annotate_status == annotate_status)
         if index_status:
             statement = statement.where(scenes.c.index_status == index_status)
+        if reference_status:
+            statement = statement.where(
+                scenes.c.reference_status == reference_status
+            )
         if active_only:
             statement = statement.where(scenes.c.is_active.is_(True))
         statement = statement.order_by(scenes.c.scene_index_in_book)
@@ -317,6 +348,58 @@ class PostgresRepository:
     # ------------------------------------------------------------------
     # Caches
     # ------------------------------------------------------------------
+    @staticmethod
+    def reference_evaluation_cache_key(
+        *,
+        model: str,
+        prompt_version: str,
+        rule_version: str,
+        input_text: str,
+    ) -> str:
+        payload = "\x1f".join(
+            (model, prompt_version, rule_version, input_text)
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def get_reference_evaluation_cache(
+        self,
+        input_hash: str,
+    ) -> Mapping[str, Any] | None:
+        with self.engine.connect() as connection:
+            row = connection.execute(
+                select(reference_evaluation_cache).where(
+                    reference_evaluation_cache.c.input_hash == input_hash
+                )
+            ).mappings().first()
+        return row
+
+    def put_reference_evaluation_cache(
+        self,
+        *,
+        input_hash: str,
+        model: str,
+        prompt_version: str,
+        rule_version: str,
+        input_text: str,
+        output_json: Mapping[str, Any],
+    ) -> None:
+        statement = (
+            pg_insert(reference_evaluation_cache)
+            .values(
+                input_hash=input_hash,
+                model=model,
+                prompt_version=prompt_version,
+                rule_version=rule_version,
+                input_text=input_text,
+                output_json=dict(output_json),
+            )
+            .on_conflict_do_nothing(
+                index_elements=[reference_evaluation_cache.c.input_hash]
+            )
+        )
+        with self.engine.begin() as connection:
+            connection.execute(statement)
+
     @staticmethod
     def annotation_cache_key(
         *,

@@ -39,6 +39,14 @@ books = Table(
     Column("current_version", Integer, nullable=False, server_default="0"),
     Column("total_chapters", Integer, nullable=False, server_default="0"),
     Column("total_scenes", Integer, nullable=False, server_default="0"),
+    Column("selected_scenes", Integer, nullable=False, server_default="0"),
+    Column("archived_scenes", Integer, nullable=False, server_default="0"),
+    Column(
+        "evaluation_failed_scenes",
+        Integer,
+        nullable=False,
+        server_default="0",
+    ),
     Column("error_message", Text),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
@@ -75,6 +83,17 @@ scenes = Table(
     Column("char_count", Integer, nullable=False),
     Column("split_reason", Text, nullable=False, server_default="rule"),
     Column("is_cross_chapter", Boolean, nullable=False, server_default="false"),
+    Column(
+        "reference_status",
+        Text,
+        nullable=False,
+        server_default="unevaluated",
+    ),
+    Column("reference_score", Float, nullable=False, server_default="0"),
+    Column("reference_reason", Text, nullable=False, server_default=""),
+    Column("reference_prompt_version", Text, nullable=False, server_default=""),
+    Column("reference_rule_version", Text, nullable=False, server_default=""),
+    Column("reference_meta_json", JSONB, nullable=False, server_default="{}"),
     Column("summary", Text, nullable=False, server_default=""),
     Column("style_summary", Text, nullable=False, server_default=""),
     Column("usage_hint", Text, nullable=False, server_default=""),
@@ -106,6 +125,12 @@ scenes = Table(
 )
 Index("idx_scenes_book", scenes.c.book_id)
 Index("idx_scenes_active", scenes.c.book_id, scenes.c.version, scenes.c.is_active)
+Index(
+    "idx_scenes_reference_status",
+    scenes.c.book_id,
+    scenes.c.version,
+    scenes.c.reference_status,
+)
 Index("idx_scenes_scene_type", scenes.c.scene_type, postgresql_using="gin")
 Index("idx_scenes_technique", scenes.c.technique, postgresql_using="gin")
 Index("idx_scenes_style_tags", scenes.c.style_tags, postgresql_using="gin")
@@ -156,6 +181,20 @@ annotation_cache = Table(
     Column("model", Text, nullable=False),
     Column("prompt_version", Text, nullable=False),
     Column("tag_vocab_version", Text, nullable=False),
+    Column("input_text", Text, nullable=False),
+    Column("output_json", JSONB, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+
+reference_evaluation_cache = Table(
+    "reference_evaluation_cache",
+    metadata,
+    Column("id", _id_type, _identity, primary_key=True),
+    Column("input_hash", Text, nullable=False, unique=True),
+    Column("model", Text, nullable=False),
+    Column("prompt_version", Text, nullable=False),
+    Column("rule_version", Text, nullable=False),
     Column("input_text", Text, nullable=False),
     Column("output_json", JSONB, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),

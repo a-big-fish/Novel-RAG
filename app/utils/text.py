@@ -15,7 +15,9 @@ _CHAPTER_PATTERNS = (
     re.compile(
         r"^\s*((?:Chapter|CHAPTER|chapter)\s+\d+(?:\s*[-:：]\s*.*)?)\s*$"
     ),
+    re.compile(r"^\s*((?:序章|楔子|尾声|后记)(?:\s+.*)?)\s*$"),
 )
+_MARKDOWN_HEADING_RE = re.compile(r"^\s*#{1,6}\s+")
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _MULTI_BLANK_RE = re.compile(r"\n{3,}")
 
@@ -56,10 +58,19 @@ def normalized_char_count(text: str) -> int:
 
 
 def is_chapter_title(line: str) -> bool:
-    stripped = line.strip()
+    stripped = _MARKDOWN_HEADING_RE.sub("", line.strip()).strip()
     if not stripped or len(stripped) > 80:
         return False
     return any(pattern.match(stripped) for pattern in _CHAPTER_PATTERNS)
+
+
+def _normalized_chapter_title(line: str) -> str:
+    return _MARKDOWN_HEADING_RE.sub("", line.strip()).strip()
+
+
+def _markdown_headings_only(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return bool(lines) and all(_MARKDOWN_HEADING_RE.match(line) for line in lines)
 
 
 def split_chapters(text: str) -> list[ChapterSlice]:
@@ -95,7 +106,7 @@ def split_chapters(text: str) -> list[ChapterSlice]:
 
     if title_positions[0] > 0:
         prefix = "\n".join(lines[: title_positions[0]]).strip()
-        if prefix:
+        if prefix and not _markdown_headings_only(prefix):
             paragraphs = split_paragraphs(prefix)
             chapters.append(
                 ChapterSlice(
@@ -115,7 +126,7 @@ def split_chapters(text: str) -> list[ChapterSlice]:
             if position_index + 1 < len(title_positions)
             else len(lines)
         )
-        title = lines[start_line].strip()
+        title = _normalized_chapter_title(lines[start_line])
         body = "\n".join(lines[start_line + 1 : end_line]).strip()
         chapter_text = f"{title}\n\n{body}".strip()
         paragraph_count = len(split_paragraphs(chapter_text))

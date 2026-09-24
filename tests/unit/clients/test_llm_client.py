@@ -12,6 +12,7 @@ from app.clients.llm_client import (
     OpenAICompatibleClient,
     extract_json_object,
 )
+from app.config import Settings
 from app.utils.errors import StorageError
 
 
@@ -38,6 +39,7 @@ def test_openai_compatible_request() -> None:
         api_key="secret",
         model="demo",
         client=httpx.Client(),
+        settings=Settings(llm_max_retries=0),
     )
     result = adapter.request_typed(
         system_prompt="system",
@@ -79,6 +81,43 @@ def test_openai_compatible_http_error() -> None:
         api_key="secret",
         model="demo",
         client=httpx.Client(),
+        settings=Settings(llm_max_retries=0),
     )
     with pytest.raises(StorageError):
         adapter.request_json(system_prompt="s", user_prompt="u")
+
+
+@respx.mock
+def test_openai_compatible_retries_transient_error() -> None:
+    route = respx.post("http://llm.test/v1/chat/completions").mock(
+        side_effect=[
+            httpx.Response(502, text="temporary gateway error"),
+            httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {"message": {"content": '{"summary":"ok"}'}}
+                    ]
+                },
+            ),
+        ]
+    )
+    adapter = OpenAICompatibleClient(
+        base_url="http://llm.test/v1",
+        api_key="secret",
+        model="demo",
+        client=httpx.Client(),
+        settings=Settings(
+            llm_max_retries=2,
+            llm_retry_backoff_seconds=0,
+        ),
+    )
+
+    result = adapter.request_typed(
+        system_prompt="system",
+        user_prompt="user",
+        response_model=DemoResponse,
+    )
+
+    assert result.summary == "ok"
+    assert route.call_count == 2

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -15,15 +16,21 @@ from app.db.models import (
     chapters,
     embedding_cache,
     index_jobs,
+    reference_evaluation_cache,
     scenes,
     token_map,
 )
 from app.db.postgres import PostgresDatabase, PostgresRepository
 from app.db.qdrant import QdrantAdapter
 from app.services.indexer import Indexer
-from app.services.schema import SceneAnnotation
+from app.services.schema import (
+    ReferenceDimensions,
+    ReferenceEvaluation,
+    SceneAnnotation,
+)
 from app.services.tagger import TagVocabulary
 from tests.fixtures.build_synthetic_micro_novel import write_micro_novel
+from tests.integration.support import build_test_database
 
 pytestmark = pytest.mark.integration
 
@@ -31,7 +38,32 @@ pytestmark = pytest.mark.integration
 class FakeLLM:
     model = "fake-annotation-model"
 
-    def request_typed(self, **kwargs: Any) -> SceneAnnotation:
+    def __init__(self) -> None:
+        self.archive_all = False
+
+    def request_typed(self, **kwargs: Any) -> Any:
+        if kwargs["response_model"] is ReferenceEvaluation:
+            scene_text = kwargs["user_prompt"]
+            selected = not self.archive_all and (
+                "雨" in scene_text or "对峙" in scene_text
+            )
+            return ReferenceEvaluation(
+                reference_status="selected" if selected else "archived",
+                reference_score=4.5 if selected else 1.5,
+                reference_reason=(
+                    "对白与氛围控制具有可迁移参考价值。"
+                    if selected
+                    else "该场景主要承担转场与信息交代。"
+                ),
+                dimensions=ReferenceDimensions(
+                    prose_quality=3.5,
+                    technique_value=4.5 if selected else 1.0,
+                    scene_completeness=4.0,
+                    context_independence=3.5,
+                    distinctiveness=4.0 if selected else 1.0,
+                    reference_value=4.5 if selected else 1.0,
+                ),
+            )
         return SceneAnnotation(
             summary="两个人在雨夜交换线索，并决定继续追查。",
             style_summary="短句与停顿营造克制、紧绷的对峙感。",
@@ -65,8 +97,17 @@ class FakeOllama:
 
 def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
     source = write_micro_novel(tmp_path / "micro-novel.txt")
+    marker = uuid.uuid4().hex[:8]
+    source.write_text(
+        source.read_text(encoding="utf-8").replace(
+            "第一章 雨夜来客",
+            f"第一章 雨夜来客 {marker}",
+            1,
+        ),
+        encoding="utf-8",
+    )
     source_sha = hashlib.sha256(source.read_bytes()).hexdigest()
-    database = PostgresDatabase.from_settings(test=True)
+    database = build_test_database()
     repository = PostgresRepository(database)
     book_id: int | None = None
     settings = Settings(
@@ -99,10 +140,11 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
             / "tag_vocab"
             / "v1.json"
         )
+        fake_llm = FakeLLM()
         indexer = Indexer(
             repository=repository,
             qdrant=qdrant,
-            llm_client=FakeLLM(),
+            llm_client=fake_llm,
             ollama_client=FakeOllama(),
             vocabulary=TagVocabulary.from_json(vocabulary_path),
             settings=settings,
@@ -118,8 +160,27 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
         assert book["status"] == "ready"
         assert book["current_version"] == 1
         assert repository.active_scene_count(book_id, 1) == result["scenes"]
-        assert qdrant.count(result["collection"]) == result["scenes"]
-        assert len(repository.list_jobs(book_id)) == 5
+        assert result["selected_scenes"] > 0
+        assert result["archived_scenes"] > 0
+        assert result["indexed_scenes"] == result["selected_scenes"]
+        assert qdrant.count(result["collection"]) == result["selected_scenes"]
+        assert len(repository.list_jobs(book_id)) == 6
+
+        first_collection = result["collection"]
+        first_selected_count = result["selected_scenes"]
+        fake_llm.archive_all = True
+        indexer.settings.reference_rule_version = "v2"
+
+        reindexed = indexer.run(book_id)
+
+        assert reindexed["version"] == 2
+        assert reindexed["selected_scenes"] == 0
+        assert reindexed["archived_scenes"] == reindexed["scenes"]
+        assert qdrant.count(reindexed["collection"]) == 0
+        assert qdrant.count(first_collection) == first_selected_count
+        book = repository.get_book(book_id)
+        assert book is not None
+        assert book["current_version"] == 2
     finally:
         if book_id is not None:
             with database.engine.begin() as connection:
@@ -134,6 +195,11 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
                 connection.execute(
                     delete(annotation_cache).where(
                         annotation_cache.c.model == FakeLLM.model
+                    )
+                )
+                connection.execute(
+                    delete(reference_evaluation_cache).where(
+                        reference_evaluation_cache.c.model == FakeLLM.model
                     )
                 )
                 connection.execute(

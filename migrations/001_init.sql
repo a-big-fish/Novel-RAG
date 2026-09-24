@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS books (
     current_version INTEGER NOT NULL DEFAULT 0,
     total_chapters INTEGER NOT NULL DEFAULT 0,
     total_scenes INTEGER NOT NULL DEFAULT 0,
+    selected_scenes INTEGER NOT NULL DEFAULT 0,
+    archived_scenes INTEGER NOT NULL DEFAULT 0,
+    evaluation_failed_scenes INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -43,6 +46,12 @@ CREATE TABLE IF NOT EXISTS scenes (
     char_count INTEGER NOT NULL,
     split_reason TEXT NOT NULL DEFAULT 'rule',
     is_cross_chapter BOOLEAN NOT NULL DEFAULT false,
+    reference_status TEXT NOT NULL DEFAULT 'unevaluated',
+    reference_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+    reference_reason TEXT NOT NULL DEFAULT '',
+    reference_prompt_version TEXT NOT NULL DEFAULT '',
+    reference_rule_version TEXT NOT NULL DEFAULT '',
+    reference_meta_json JSONB NOT NULL DEFAULT '{}',
     summary TEXT NOT NULL DEFAULT '',
     style_summary TEXT NOT NULL DEFAULT '',
     usage_hint TEXT NOT NULL DEFAULT '',
@@ -71,6 +80,8 @@ CREATE TABLE IF NOT EXISTS scenes (
 CREATE INDEX IF NOT EXISTS idx_scenes_book ON scenes (book_id);
 CREATE INDEX IF NOT EXISTS idx_scenes_active
     ON scenes (book_id, version, is_active);
+CREATE INDEX IF NOT EXISTS idx_scenes_reference_status
+    ON scenes (book_id, version, reference_status);
 CREATE INDEX IF NOT EXISTS idx_scenes_scene_type ON scenes USING gin (scene_type);
 CREATE INDEX IF NOT EXISTS idx_scenes_technique ON scenes USING gin (technique);
 CREATE INDEX IF NOT EXISTS idx_scenes_style_tags ON scenes USING gin (style_tags);
@@ -105,6 +116,17 @@ CREATE TABLE IF NOT EXISTS annotation_cache (
     model TEXT NOT NULL,
     prompt_version TEXT NOT NULL,
     tag_vocab_version TEXT NOT NULL,
+    input_text TEXT NOT NULL,
+    output_json JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS reference_evaluation_cache (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    input_hash TEXT NOT NULL UNIQUE,
+    model TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    rule_version TEXT NOT NULL,
     input_text TEXT NOT NULL,
     output_json JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
