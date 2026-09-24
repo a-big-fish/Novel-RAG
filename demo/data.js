@@ -1,0 +1,3491 @@
+window.BIZHEN_DEMO = {
+  "generated_at": "2026-09-20T16:07:07+08:00",
+  "dataset": {
+    "name": "雨夜微型样本",
+    "source_path": "E:\\novels\\novel-rag\\data\\books\\micro-novel-smoke.txt",
+    "source_chars": 4112,
+    "chapters": 9,
+    "scenes": 27,
+    "book_id": 20,
+    "source_collection": "scenes_book_20_v2",
+    "compare_collection": "scenes_book_20_v1",
+    "vector_dimension": 1024,
+    "vectors": {
+      "dense": [
+        "meta-dense",
+        "summary-dense",
+        "text-dense"
+      ],
+      "sparse": [
+        "text-sparse"
+      ]
+    },
+    "points": 27,
+    "collection_status": "green",
+    "provenance": "真实 Qdrant 标注与向量数据；正文来自 4112 字合成微型小说。book_id=20 的 PostgreSQL 记录已被测试清理，演示数据由 Qdrant payload 与原始 TXT 对齐导出。"
+  },
+  "runtime_sample": {
+    "book_id": 33,
+    "title": "新Key验收微型小说 6a32b9c8",
+    "status": "ready",
+    "chapters": 2,
+    "scenes": 5,
+    "annotated": 5,
+    "indexed": 5,
+    "jobs": [
+      {
+        "stage": "sync",
+        "status": "completed",
+        "done_items": 5
+      },
+      {
+        "stage": "embed",
+        "status": "completed",
+        "done_items": 5
+      },
+      {
+        "stage": "annotate",
+        "status": "completed",
+        "done_items": 5
+      },
+      {
+        "stage": "split",
+        "status": "completed",
+        "done_items": 0
+      },
+      {
+        "stage": "prepare_text",
+        "status": "completed",
+        "done_items": 0
+      }
+    ]
+  },
+  "chapters": [
+    {
+      "index": 1,
+      "title": "第一章 雨夜来客",
+      "char_count": 417,
+      "scene_count": 3,
+      "scene_indexes": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "index": 2,
+      "title": "第二章 旧城试探",
+      "char_count": 425,
+      "scene_count": 3,
+      "scene_indexes": [
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "index": 3,
+      "title": "第三章 灯火交锋",
+      "char_count": 423,
+      "scene_count": 3,
+      "scene_indexes": [
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "index": 4,
+      "title": "第四章 真相边缘",
+      "char_count": 422,
+      "scene_count": 3,
+      "scene_indexes": [
+        10,
+        11,
+        12
+      ]
+    },
+    {
+      "index": 5,
+      "title": "第五章 风停之后",
+      "char_count": 421,
+      "scene_count": 3,
+      "scene_indexes": [
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "index": 6,
+      "title": "第6章 回声",
+      "char_count": 417,
+      "scene_count": 3,
+      "scene_indexes": [
+        16,
+        17,
+        18
+      ]
+    },
+    {
+      "index": 7,
+      "title": "第7章 回声",
+      "char_count": 414,
+      "scene_count": 3,
+      "scene_indexes": [
+        19,
+        20,
+        21
+      ]
+    },
+    {
+      "index": 8,
+      "title": "第8章 回声",
+      "char_count": 409,
+      "scene_count": 3,
+      "scene_indexes": [
+        22,
+        23,
+        24
+      ]
+    },
+    {
+      "index": 9,
+      "title": "第9章 回声",
+      "char_count": 414,
+      "scene_count": 3,
+      "scene_indexes": [
+        25,
+        26,
+        27
+      ]
+    }
+  ],
+  "scenes": [
+    {
+      "index": 1,
+      "scene_id": 229,
+      "chapter_start": 1,
+      "chapter_end": 1,
+      "text": "第一章 雨夜来客\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。",
+      "char_count": 144,
+      "summary": "雨夜，她收伞站在门槛外，迟迟不敲门。屋内灯亮，窗纸映出踱步人影。门开后，他未问来意，只侧身让路。潮湿木头与冷茶气味弥漫，两人沉默。桌角压着一封被剥开火漆的无署名信，她看了一眼，指尖停在袖口，仿佛忘了下一步。",
+      "style_summary": "以极简动作与感官细节建立悬念：不写心理，只写收伞、停步、让路、气味、信与指尖，留白充分，节奏克制，适合作为开篇氛围与人物关系暗线的范本。",
+      "usage_hint": "适合参考如何用环境、动作和物件暗示关系与秘密；避免过早解释人物动机或补全对白，保持悬停感。",
+      "scene_type": [
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "cinematic",
+        "restrained",
+        "lyrical",
+        "short_sentence",
+        "dark"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "克制",
+        "抒情",
+        "短句",
+        "暗黑"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛"
+      ],
+      "key_images": [
+        "rain",
+        "door",
+        "light",
+        "window",
+        "night"
+      ],
+      "key_images_display": [
+        "雨",
+        "门",
+        "灯火",
+        "窗",
+        "夜晚"
+      ],
+      "narrative_func": "open",
+      "narrative_func_display": "开篇引入",
+      "x": 0.27564,
+      "y": 0.38424,
+      "neighbors": [
+        {
+          "index": 14,
+          "score": 0.8817
+        },
+        {
+          "index": 3,
+          "score": 0.8701
+        },
+        {
+          "index": 17,
+          "score": 0.8701
+        }
+      ],
+      "chapter_title": "第一章 雨夜来客"
+    },
+    {
+      "index": 2,
+      "scene_id": 230,
+      "chapter_start": 1,
+      "chapter_end": 1,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。",
+      "char_count": 135,
+      "summary": "第二天，新线索将两人推向同一条窄路。他提醒事情比想象中更麻烦，她笑着说不怕麻烦。钟声远去，城中灯火渐暗；桌下的刀无人触碰，却始终在场。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门。",
+      "style_summary": "以极简对白与冷峻意象推进，钟声、灯火、桌下刀、雨声层层压出不安；不直写危险，而用物件与动作留白，短句节奏克制，适合学习氛围悬疑与张力铺垫。",
+      "usage_hint": "适合参考用环境细节和未触碰的刀制造悬念，以短对白暗示人物立场；避免解释过多或让意象堆砌压过人物行动。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "foreshadow",
+        "sensory_detail",
+        "show_dont_tell",
+        "contrast"
+      ],
+      "technique_display": [
+        "埋伏笔",
+        "感官描写",
+        "以行动代替说明",
+        "反差"
+      ],
+      "style_tags": [
+        "cinematic",
+        "dark",
+        "restrained",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "暗黑",
+        "克制",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "night",
+        "door",
+        "light"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "夜晚",
+        "门",
+        "灯火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.81724,
+      "y": 0.27144,
+      "neighbors": [
+        {
+          "index": 18,
+          "score": 1.0
+        },
+        {
+          "index": 21,
+          "score": 0.945
+        },
+        {
+          "index": 5,
+          "score": 0.945
+        }
+      ],
+      "chapter_title": "第一章 雨夜来客"
+    },
+    {
+      "index": 3,
+      "scene_id": 231,
+      "chapter_start": 1,
+      "chapter_end": 1,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。",
+      "char_count": 138,
+      "summary": "第二天，新的线索把两人再次推向同一条窄路。屋内灯亮，窗纸映出踱步人影。他开门后不问来意，只侧身让路。潮湿木头与冷茶气味中，两人沉默相对。桌角压着一封无署名信，火漆已被剥开。她瞥信一眼，指尖停在袖口，像忘了下一步。",
+      "style_summary": "以极简动作、环境光影与气味细节制造悬疑张力，不直写心理，用未署名信和停顿动作暗示秘密与关系，留白强，适合作为氛围范本。",
+      "usage_hint": "适合参考用环境细节和动作停顿写暧昧或悬疑重逢，避免解释过多、直接交代人物动机或情绪。",
+      "scene_type": [
+        "mystery",
+        "emotional",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景",
+        "调查场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "cinematic",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "电影感",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛"
+      ],
+      "key_images": [
+        "door",
+        "light",
+        "window"
+      ],
+      "key_images_display": [
+        "门",
+        "灯火",
+        "窗"
+      ],
+      "narrative_func": "open",
+      "narrative_func_display": "开篇引入",
+      "x": 0.0,
+      "y": 0.46429,
+      "neighbors": [
+        {
+          "index": 17,
+          "score": 1.0
+        },
+        {
+          "index": 14,
+          "score": 0.9602
+        },
+        {
+          "index": 20,
+          "score": 0.9537
+        }
+      ],
+      "chapter_title": "第一章 雨夜来客"
+    },
+    {
+      "index": 4,
+      "scene_id": 232,
+      "chapter_start": 2,
+      "chapter_end": 2,
+      "text": "第二章 旧城试探\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。",
+      "char_count": 152,
+      "summary": "旧城试探中，她夜访他的住处。屋内灯亮，窗纸映出踱步人影；他开门不问来意，只侧身让路。潮湿木头与冷茶气味里，两人沉默相对。桌角压着被剥开火漆的未署名信，她瞥见后指尖停在袖口，似忘了下一步。他提醒事情比想象更麻烦，她笑称自己从不怕麻烦。",
+      "style_summary": "以极简对白、动作停顿和气味光影构建张力，未署名信与火漆承担伏笔，人物关系与危机均不直说，留白克制，适合冷峻悬疑或情感试探场景。",
+      "usage_hint": "适合参考用沉默、物件和短对白写试探与暗流；避免解释人物心理或让环境描写压过动作节奏。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "short_sentence",
+        "cinematic",
+        "dark"
+      ],
+      "style_tags_display": [
+        "克制",
+        "短句",
+        "电影感",
+        "暗黑"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "key_images": [
+        "light",
+        "window",
+        "door",
+        "fire"
+      ],
+      "key_images_display": [
+        "灯火",
+        "窗",
+        "门",
+        "火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.29951,
+      "y": 0.58245,
+      "neighbors": [
+        {
+          "index": 17,
+          "score": 0.8358
+        },
+        {
+          "index": 3,
+          "score": 0.8358
+        },
+        {
+          "index": 1,
+          "score": 0.834
+        }
+      ],
+      "chapter_title": "第二章 旧城试探"
+    },
+    {
+      "index": 5,
+      "scene_id": 233,
+      "chapter_start": 2,
+      "chapter_end": 2,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。",
+      "char_count": 129,
+      "summary": "第二天，新线索将两人推向同一条窄路。城中钟声响起，灯火渐暗。桌下藏刀，无人触碰却都记挂。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门；屋内灯亮，窗纸映出踱步人影。气氛紧绷，暗示会面与冲突将至。",
+      "style_summary": "以极简短句和感官细节营造悬疑氛围：钟声、灯暗、雨声、窗影层层递进，用未触碰的刀与未敲的门制造张力，是“以物写心、以景蓄势”的范本。",
+      "usage_hint": "适合参考用环境细节与物件暗示人物关系、铺垫冲突；避免堆砌意象导致节奏拖沓，或让悬念只停留在氛围而不推进线索。",
+      "scene_type": [
+        "mystery",
+        "emotional",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景",
+        "调查场景"
+      ],
+      "technique": [
+        "foreshadow",
+        "sensory_detail",
+        "show_dont_tell",
+        "contrast"
+      ],
+      "technique_display": [
+        "埋伏笔",
+        "感官描写",
+        "以行动代替说明",
+        "反差"
+      ],
+      "style_tags": [
+        "cinematic",
+        "dark",
+        "lyrical",
+        "restrained",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "暗黑",
+        "抒情",
+        "克制",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "light",
+        "window",
+        "door"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "灯火",
+        "窗",
+        "门"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.77486,
+      "y": 0.26036,
+      "neighbors": [
+        {
+          "index": 21,
+          "score": 1.0
+        },
+        {
+          "index": 18,
+          "score": 0.945
+        },
+        {
+          "index": 2,
+          "score": 0.945
+        }
+      ],
+      "chapter_title": "第二章 旧城试探"
+    },
+    {
+      "index": 6,
+      "scene_id": 234,
+      "chapter_start": 2,
+      "chapter_end": 2,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。",
+      "char_count": 144,
+      "summary": "第二天，新线索将两人再次推向同一窄路。他开门后不问来意，只侧身让路；潮湿木头与冷茶的气味中，两人沉默相对。桌角压着一封被剥开火漆的无署名信。她瞥信后指尖停在袖口，他警告事情更麻烦，她却笑称从不怕麻烦。",
+      "style_summary": "以极简动作、对白和感官细节推进，不直写心理；用未署名信、剥开火漆和停顿制造悬疑与暧昧，留白克制，适合学习冷峻双人戏。",
+      "usage_hint": "适合参考线索交接、双人重逢或对峙场景的克制写法；避免解释性旁白和情绪直给，保持动作与物件承载信息。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "short_sentence",
+        "cinematic",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "短句",
+        "电影感",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "door",
+        "fire"
+      ],
+      "key_images_display": [
+        "门",
+        "火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.02279,
+      "y": 0.63813,
+      "neighbors": [
+        {
+          "index": 20,
+          "score": 1.0
+        },
+        {
+          "index": 17,
+          "score": 0.9537
+        },
+        {
+          "index": 3,
+          "score": 0.9537
+        }
+      ],
+      "chapter_title": "第二章 旧城试探"
+    },
+    {
+      "index": 7,
+      "scene_id": 235,
+      "chapter_start": 3,
+      "chapter_end": 3,
+      "text": "第三章 灯火交锋\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。",
+      "char_count": 150,
+      "summary": "她夜访他处，门开后两人沉默相对。桌角一封被拆开的无署名信成为焦点，她欲动又止。他提醒事情比预想更麻烦，她笑称不怕麻烦。远处钟声响起，城中灯火渐次熄灭，暗示局势转暗、交锋开始。",
+      "style_summary": "以极简动作、气味与物件承载信息：开门不追问、火漆被剥、指尖停在袖口，均用留白和细节推进；对话短促，钟声与灯火收束，营造冷峻悬疑与压迫感。",
+      "usage_hint": "适合参考用环境细节和克制对话制造张力、以物件埋伏笔；避免解释过多或让人物直白交代关系与背景。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "short_sentence",
+        "cinematic",
+        "dark",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "短句",
+        "电影感",
+        "暗黑",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "door",
+        "light",
+        "night"
+      ],
+      "key_images_display": [
+        "门",
+        "灯火",
+        "夜晚"
+      ],
+      "narrative_func": "conflict",
+      "narrative_func_display": "制造冲突",
+      "x": 0.61438,
+      "y": 0.94733,
+      "neighbors": [
+        {
+          "index": 23,
+          "score": 0.8568
+        },
+        {
+          "index": 9,
+          "score": 0.8568
+        },
+        {
+          "index": 26,
+          "score": 0.8434
+        }
+      ],
+      "chapter_title": "第三章 灯火交锋"
+    },
+    {
+      "index": 8,
+      "scene_id": 236,
+      "chapter_start": 3,
+      "chapter_end": 3,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。",
+      "char_count": 132,
+      "summary": "第二天，新线索将两人推向同一条窄路。桌下藏着刀，无人触碰却无人忘记。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门。屋内灯亮，窗纸映出踱步身影。门开后，他不问来意，只侧身让路。",
+      "style_summary": "以极简动作与物象承载悬念：刀、雨、灯、窗影构成压迫氛围，人物不解释来意，用沉默和让路完成关系推进，是克制叙事的范本。",
+      "usage_hint": "适合参考用环境细节和留白写紧张重逢或线索汇合；避免过度解释心理，保持动作与物象的克制。",
+      "scene_type": [
+        "mystery",
+        "emotional",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景",
+        "调查场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "contrast"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "反差"
+      ],
+      "style_tags": [
+        "restrained",
+        "cinematic",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "电影感",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear",
+        "relief"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧",
+        "释然"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "door",
+        "light",
+        "window"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "门",
+        "灯火",
+        "窗"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.57006,
+      "y": 0.0548,
+      "neighbors": [
+        {
+          "index": 24,
+          "score": 1.0
+        },
+        {
+          "index": 18,
+          "score": 0.9278
+        },
+        {
+          "index": 2,
+          "score": 0.9278
+        }
+      ],
+      "chapter_title": "第三章 灯火交锋"
+    },
+    {
+      "index": 9,
+      "scene_id": 237,
+      "chapter_start": 3,
+      "chapter_end": 3,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。",
+      "char_count": 141,
+      "summary": "第二天，新线索将两人推向同一条窄路。潮湿木头与冷茶气味中，两人沉默对峙。桌角压着一封被剥开火漆的无署名信，她目光触及却停在袖口。他提醒事情比想象中麻烦，她笑称从不怕麻烦。远处钟声响起，城中灯火次第熄灭，气氛愈发压抑。",
+      "style_summary": "以极简对白和克制动作推进，用气味、火漆、钟声、灯火等细节营造悬疑与压迫感；沉默与短句交替，留白充分，是“少即是多”的范本。",
+      "usage_hint": "适合参考用环境细节和留白写对峙、埋线索；避免解释过多或让对白直白交代信息，保持暧昧与节奏。",
+      "scene_type": [
+        "mystery",
+        "dialogue_conflict",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "对话冲突",
+        "情感场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "cinematic",
+        "short_sentence",
+        "dark",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "电影感",
+        "短句",
+        "暗黑",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "light",
+        "night",
+        "fire"
+      ],
+      "key_images_display": [
+        "灯火",
+        "夜晚",
+        "火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.32183,
+      "y": 0.73741,
+      "neighbors": [
+        {
+          "index": 23,
+          "score": 1.0
+        },
+        {
+          "index": 20,
+          "score": 0.9223
+        },
+        {
+          "index": 6,
+          "score": 0.9223
+        }
+      ],
+      "chapter_title": "第三章 灯火交锋"
+    },
+    {
+      "index": 10,
+      "scene_id": 238,
+      "chapter_start": 4,
+      "chapter_end": 4,
+      "text": "第四章 真相边缘\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。",
+      "char_count": 149,
+      "summary": "第4章，两人在潮湿木味与冷茶中对坐，桌角一封被拆开的无署名信成为焦点。她欲动又止，他直言事情比想象更麻烦，她笑称不怕麻烦。远处钟声响起，城中灯火渐灭；桌下刀无人触碰，却始终在场，暗示危险与真相逼近。",
+      "style_summary": "以极简对白和克制动作推进，靠气味、钟声、灯火与桌下刀等细节制造压迫感；不直说危险，却让沉默、未拆信与未碰的刀共同蓄势，是悬疑对话场景的范本。",
+      "usage_hint": "适合参考如何用环境细节和道具暗示冲突、以短对白塑造人物；避免过度解释信件内容或人物心理，保留留白与危险感。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "contrast"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "反差"
+      ],
+      "style_tags": [
+        "restrained",
+        "dark",
+        "cinematic",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "暗黑",
+        "电影感",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "light",
+        "night"
+      ],
+      "key_images_display": [
+        "刀",
+        "灯火",
+        "夜晚"
+      ],
+      "narrative_func": "conflict",
+      "narrative_func_display": "制造冲突",
+      "x": 0.64622,
+      "y": 1.0,
+      "neighbors": [
+        {
+          "index": 26,
+          "score": 0.8279
+        },
+        {
+          "index": 12,
+          "score": 0.8279
+        },
+        {
+          "index": 7,
+          "score": 0.82
+        }
+      ],
+      "chapter_title": "第四章 真相边缘"
+    },
+    {
+      "index": 11,
+      "scene_id": 239,
+      "chapter_start": 4,
+      "chapter_end": 4,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。",
+      "char_count": 135,
+      "summary": "第二天，新线索让两人再次走向同一条窄路。雨落旧城屋檐，她收伞站在门槛外，迟疑未敲。屋内灯亮，窗纸映出踱步人影。门开，他不问来意，只侧身让路。潮湿木头与冷茶气味中，两人沉默相对，谁也没有先开口。",
+      "style_summary": "以雨声、灯影、气味等感官细节铺陈氛围，用收伞、不敲门、侧身让路等动作替代对白，留白克制，暗示默契与未言明的紧张，是show_dont_tell与节奏控制的范本。",
+      "usage_hint": "适合参考用环境细节与人物微动作写重逢、对峙或合作前奏；避免意象堆砌和过度解释关系，留白须服务线索推进与人物张力。",
+      "scene_type": [
+        "emotional",
+        "mystery",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "情感场景",
+        "悬疑场景",
+        "调查场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "contrast",
+        "rhythm_shift"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "反差",
+        "节奏变化"
+      ],
+      "style_tags": [
+        "restrained",
+        "lyrical",
+        "cinematic",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "克制",
+        "抒情",
+        "电影感",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache",
+        "relief"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "key_images": [
+        "rain",
+        "door",
+        "light",
+        "window"
+      ],
+      "key_images_display": [
+        "雨",
+        "门",
+        "灯火",
+        "窗"
+      ],
+      "narrative_func": "transition",
+      "narrative_func_display": "过场衔接",
+      "x": 0.30306,
+      "y": 0.0,
+      "neighbors": [
+        {
+          "index": 27,
+          "score": 1.0
+        },
+        {
+          "index": 24,
+          "score": 0.9144
+        },
+        {
+          "index": 8,
+          "score": 0.9144
+        }
+      ],
+      "chapter_title": "第四章 真相边缘"
+    },
+    {
+      "index": 12,
+      "scene_id": 240,
+      "chapter_start": 4,
+      "chapter_end": 4,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。",
+      "char_count": 138,
+      "summary": "次日，新线索将两人再次推向同一条窄路。桌角压着一封被剥开火漆的匿名信，她只看一眼便指尖停在袖口，像忘了下一步。他提醒事情比预想更麻烦，她笑称自己从不怕麻烦。远处钟声响起，城中灯火渐暗，桌下的刀无人触碰，却成为两人共同记得的威胁。",
+      "style_summary": "以极简动作和物件承载悬念：匿名信、未碰的刀、渐暗灯火构成克制张力。对话短促，留白充分，适合学习以少胜多、以静写危。",
+      "usage_hint": "适合参考悬疑或情感场景中的留白、道具伏笔与短句节奏；避免过度解释人物心理或补全信息，保持暧昧与压迫感。",
+      "scene_type": [
+        "mystery",
+        "dialogue_conflict",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "对话冲突",
+        "情感场景"
+      ],
+      "technique": [
+        "foreshadow",
+        "show_dont_tell",
+        "sensory_detail"
+      ],
+      "technique_display": [
+        "埋伏笔",
+        "以行动代替说明",
+        "感官描写"
+      ],
+      "style_tags": [
+        "restrained",
+        "short_sentence",
+        "cinematic",
+        "dark"
+      ],
+      "style_tags_display": [
+        "克制",
+        "短句",
+        "电影感",
+        "暗黑"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "light",
+        "night"
+      ],
+      "key_images_display": [
+        "刀",
+        "灯火",
+        "夜晚"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.55597,
+      "y": 0.8869,
+      "neighbors": [
+        {
+          "index": 26,
+          "score": 1.0
+        },
+        {
+          "index": 23,
+          "score": 0.9078
+        },
+        {
+          "index": 9,
+          "score": 0.9078
+        }
+      ],
+      "chapter_title": "第四章 真相边缘"
+    },
+    {
+      "index": 13,
+      "scene_id": 241,
+      "chapter_start": 5,
+      "chapter_end": 5,
+      "text": "第五章 风停之后\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。",
+      "char_count": 148,
+      "summary": "桌角压着一封被剥开火漆的无署名信，她指尖停在袖口，像忘了下一步。他说事情比想的更麻烦，她笑称从不怕麻烦。远处钟声响起，城中灯火渐次熄灭；桌下刀无人触碰，却无人忘记。雨敲旧城屋檐，如薄铁皮反复作响。",
+      "style_summary": "以极简动作、对白和物象推进，不解释情绪，靠信、刀、灯、雨等意象制造悬停感；短句与留白形成冷峻张力，适合学习用环境收束对话、以未触碰之物写共同记忆。",
+      "usage_hint": "适合参考用道具与声音营造悬念、以克制对白暗示冲突；避免堆砌解释或让意象过密，需保持留白与节奏。",
+      "scene_type": [
+        "mystery",
+        "dialogue_conflict",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "对话冲突",
+        "情感场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "foreshadow",
+        "sensory_detail",
+        "contrast"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "埋伏笔",
+        "感官描写",
+        "反差"
+      ],
+      "style_tags": [
+        "cinematic",
+        "dark",
+        "lyrical",
+        "restrained",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "暗黑",
+        "抒情",
+        "克制",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "light",
+        "night"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "灯火",
+        "夜晚"
+      ],
+      "narrative_func": "transition",
+      "narrative_func_display": "过场衔接",
+      "x": 0.80326,
+      "y": 0.8356,
+      "neighbors": [
+        {
+          "index": 15,
+          "score": 0.874
+        },
+        {
+          "index": 12,
+          "score": 0.8705
+        },
+        {
+          "index": 26,
+          "score": 0.8705
+        }
+      ],
+      "chapter_title": "第五章 风停之后"
+    },
+    {
+      "index": 14,
+      "scene_id": 242,
+      "chapter_start": 5,
+      "chapter_end": 5,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。",
+      "char_count": 133,
+      "summary": "第二天，新线索让两人再次被推向同一条窄路。她收伞站在门槛外，没有立刻敲门；屋内灯亮，窗纸映出踱步人影。他开门后不问来意，只侧身让路。潮湿木头与冷茶气味中，两人沉默相对。桌角压着一封无署名信，火漆已被人剥开，暗示秘密与危险。",
+      "style_summary": "以极简动作、感官细节和留白制造悬疑张力，门、灯影、冷茶、火漆信等意象承担叙事，沉默比对话更有力，适合学习克制推进关系与线索。",
+      "usage_hint": "适合写重逢、调查前奏或线索交接，用环境与动作暗示人物关系；避免直接解释情绪或过早揭示信件内容。",
+      "scene_type": [
+        "mystery",
+        "emotional",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景",
+        "调查场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "short_sentence",
+        "cinematic",
+        "dark"
+      ],
+      "style_tags_display": [
+        "克制",
+        "短句",
+        "电影感",
+        "暗黑"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛"
+      ],
+      "key_images": [
+        "door",
+        "light",
+        "rain",
+        "window"
+      ],
+      "key_images_display": [
+        "门",
+        "灯火",
+        "雨",
+        "窗"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.07128,
+      "y": 0.37041,
+      "neighbors": [
+        {
+          "index": 17,
+          "score": 0.9602
+        },
+        {
+          "index": 3,
+          "score": 0.9602
+        },
+        {
+          "index": 20,
+          "score": 0.9391
+        }
+      ],
+      "chapter_title": "第五章 风停之后"
+    },
+    {
+      "index": 15,
+      "scene_id": 243,
+      "chapter_start": 5,
+      "chapter_end": 5,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。",
+      "char_count": 140,
+      "summary": "第二天，新的线索把两人再次推向同一条窄路。她看了那封信一眼，指尖停在袖口，像忘了下一步。他说事情比你想的更麻烦，她笑说从不害怕麻烦。钟声传来，城里灯一盏盏暗下；桌下的刀无人触碰，却谁都没忘。雨敲旧城屋檐，像薄铁皮被反复击响。",
+      "style_summary": "以极简动作、克制对话和冷感物象推进，刀、灯、雨、钟声不直说危险，却让危机与暧昧同时悬置；短句与留白控制节奏，适合学习悬疑氛围的暗示写法。",
+      "usage_hint": "适合参考用环境与道具暗示冲突、写克制对话和悬疑氛围；避免过度解释心理或堆砌意象，以免拖慢节奏。",
+      "scene_type": [
+        "mystery",
+        "dialogue_conflict",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "对话冲突",
+        "情感场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "contrast"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "反差"
+      ],
+      "style_tags": [
+        "cinematic",
+        "dark",
+        "restrained",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "暗黑",
+        "克制",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "night",
+        "light"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "夜晚",
+        "灯火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.75831,
+      "y": 0.47334,
+      "neighbors": [
+        {
+          "index": 18,
+          "score": 0.9407
+        },
+        {
+          "index": 2,
+          "score": 0.9407
+        },
+        {
+          "index": 21,
+          "score": 0.903
+        }
+      ],
+      "chapter_title": "第五章 风停之后"
+    },
+    {
+      "index": 16,
+      "scene_id": 244,
+      "chapter_start": 6,
+      "chapter_end": 6,
+      "text": "第6章 回声\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。",
+      "char_count": 144,
+      "summary": "第6章开篇，她读信后指尖停在袖口，他提醒事情比预想更麻烦，她笑称不怕麻烦。钟声远去，城中灯火渐暗；桌下刀无人触碰却始终在场。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门。",
+      "style_summary": "以极简对白与克制动作推进，用灯光、钟声、雨声和桌下刀构建压迫氛围；不直说危险，而让物件与停顿替人物说话，适合学习留白与感官细节。",
+      "usage_hint": "适合参考如何用短句、意象和未完成动作制造悬念；避免堆砌解释或让对白过度说明，保持信息克制。",
+      "scene_type": [
+        "emotional",
+        "mystery",
+        "dialogue_conflict"
+      ],
+      "scene_type_display": [
+        "情感场景",
+        "悬疑场景",
+        "对话冲突"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "contrast"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "反差"
+      ],
+      "style_tags": [
+        "cinematic",
+        "dark",
+        "lyrical",
+        "restrained",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "暗黑",
+        "抒情",
+        "克制",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "light",
+        "door",
+        "night"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "灯火",
+        "门",
+        "夜晚"
+      ],
+      "narrative_func": "open",
+      "narrative_func_display": "开篇引入",
+      "x": 0.95317,
+      "y": 0.6074,
+      "neighbors": [
+        {
+          "index": 19,
+          "score": 0.8872
+        },
+        {
+          "index": 18,
+          "score": 0.854
+        },
+        {
+          "index": 2,
+          "score": 0.854
+        }
+      ],
+      "chapter_title": "第6章 回声"
+    },
+    {
+      "index": 17,
+      "scene_id": 245,
+      "chapter_start": 6,
+      "chapter_end": 6,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。",
+      "char_count": 138,
+      "summary": "第二天，新的线索把两人再次推向同一条窄路。屋内灯亮，窗纸映出踱步人影。他开门后不问来意，只侧身让路。潮湿木头与冷茶气味中，两人沉默相对。桌角压着一封无署名信，火漆已被剥开。她瞥信一眼，指尖停在袖口，像忘了下一步。",
+      "style_summary": "以极简动作、环境光影与气味细节制造悬疑张力，不直写心理，用未署名信和停顿动作暗示秘密与关系，留白强，适合作为氛围范本。",
+      "usage_hint": "适合参考用环境细节和动作停顿写暧昧或悬疑重逢，避免解释过多、直接交代人物动机或情绪。",
+      "scene_type": [
+        "mystery",
+        "emotional",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景",
+        "调查场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "cinematic",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "电影感",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛"
+      ],
+      "key_images": [
+        "door",
+        "light",
+        "window"
+      ],
+      "key_images_display": [
+        "门",
+        "灯火",
+        "窗"
+      ],
+      "narrative_func": "open",
+      "narrative_func_display": "开篇引入",
+      "x": 0.0,
+      "y": 0.46429,
+      "neighbors": [
+        {
+          "index": 3,
+          "score": 1.0
+        },
+        {
+          "index": 14,
+          "score": 0.9602
+        },
+        {
+          "index": 20,
+          "score": 0.9537
+        }
+      ],
+      "chapter_title": "第6章 回声"
+    },
+    {
+      "index": 18,
+      "scene_id": 246,
+      "chapter_start": 6,
+      "chapter_end": 6,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。",
+      "char_count": 135,
+      "summary": "第二天，新线索将两人推向同一条窄路。他提醒事情比想象中更麻烦，她笑着说不怕麻烦。钟声远去，城中灯火渐暗；桌下的刀无人触碰，却始终在场。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门。",
+      "style_summary": "以极简对白与冷峻意象推进，钟声、灯火、桌下刀、雨声层层压出不安；不直写危险，而用物件与动作留白，短句节奏克制，适合学习氛围悬疑与张力铺垫。",
+      "usage_hint": "适合参考用环境细节和未触碰的刀制造悬念，以短对白暗示人物立场；避免解释过多或让意象堆砌压过人物行动。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "foreshadow",
+        "sensory_detail",
+        "show_dont_tell",
+        "contrast"
+      ],
+      "technique_display": [
+        "埋伏笔",
+        "感官描写",
+        "以行动代替说明",
+        "反差"
+      ],
+      "style_tags": [
+        "cinematic",
+        "dark",
+        "restrained",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "暗黑",
+        "克制",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "night",
+        "door",
+        "light"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "夜晚",
+        "门",
+        "灯火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.81724,
+      "y": 0.27144,
+      "neighbors": [
+        {
+          "index": 2,
+          "score": 1.0
+        },
+        {
+          "index": 5,
+          "score": 0.945
+        },
+        {
+          "index": 21,
+          "score": 0.945
+        }
+      ],
+      "chapter_title": "第6章 回声"
+    },
+    {
+      "index": 19,
+      "scene_id": 247,
+      "chapter_start": 7,
+      "chapter_end": 7,
+      "text": "第7章 回声\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。",
+      "char_count": 141,
+      "summary": "第7章开篇，男人告知她事情比预想更麻烦，她笑着回应自己从不怕麻烦。钟声响起，城中灯火渐暗；桌下藏刀无人触碰却始终被记挂。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门，屋内灯亮，窗纸上映出踱步人影。",
+      "style_summary": "以极简对白和密集意象营造悬疑张力：刀、钟声、雨、灯影皆不直说危险，却让危险在场。短句与留白控制节奏，适合学习用环境细节替代心理说明。",
+      "usage_hint": "适合参考用道具与光影制造压迫感、以留白收束场景；避免堆砌意象导致信息过载，或让对白过于直白解释冲突。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "contrast"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "反差"
+      ],
+      "style_tags": [
+        "restrained",
+        "lyrical",
+        "cinematic",
+        "dark",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "克制",
+        "抒情",
+        "电影感",
+        "暗黑",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "light",
+        "window",
+        "door"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "灯火",
+        "窗",
+        "门"
+      ],
+      "narrative_func": "open",
+      "narrative_func_display": "开篇引入",
+      "x": 1.0,
+      "y": 0.50953,
+      "neighbors": [
+        {
+          "index": 16,
+          "score": 0.8872
+        },
+        {
+          "index": 2,
+          "score": 0.8533
+        },
+        {
+          "index": 18,
+          "score": 0.8533
+        }
+      ],
+      "chapter_title": "第7章 回声"
+    },
+    {
+      "index": 20,
+      "scene_id": 248,
+      "chapter_start": 7,
+      "chapter_end": 7,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。",
+      "char_count": 144,
+      "summary": "第二天，新线索将两人再次推向同一窄路。他开门后不问来意，只侧身让路；潮湿木头与冷茶的气味中，两人沉默相对。桌角压着一封被剥开火漆的无署名信。她瞥信后指尖停在袖口，他警告事情更麻烦，她却笑称从不怕麻烦。",
+      "style_summary": "以极简动作、对白和感官细节推进，不直写心理；用未署名信、剥开火漆和停顿制造悬疑与暧昧，留白克制，适合学习冷峻双人戏。",
+      "usage_hint": "适合参考线索交接、双人重逢或对峙场景的克制写法；避免解释性旁白和情绪直给，保持动作与物件承载信息。",
+      "scene_type": [
+        "dialogue_conflict",
+        "mystery",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "对话冲突",
+        "悬疑场景",
+        "情感场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "short_sentence",
+        "cinematic",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "短句",
+        "电影感",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "door",
+        "fire"
+      ],
+      "key_images_display": [
+        "门",
+        "火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.02279,
+      "y": 0.63813,
+      "neighbors": [
+        {
+          "index": 6,
+          "score": 1.0
+        },
+        {
+          "index": 3,
+          "score": 0.9537
+        },
+        {
+          "index": 17,
+          "score": 0.9537
+        }
+      ],
+      "chapter_title": "第7章 回声"
+    },
+    {
+      "index": 21,
+      "scene_id": 249,
+      "chapter_start": 7,
+      "chapter_end": 7,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。",
+      "char_count": 129,
+      "summary": "第二天，新线索将两人推向同一条窄路。城中钟声响起，灯火渐暗。桌下藏刀，无人触碰却都记挂。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门；屋内灯亮，窗纸映出踱步人影。气氛紧绷，暗示会面与冲突将至。",
+      "style_summary": "以极简短句和感官细节营造悬疑氛围：钟声、灯暗、雨声、窗影层层递进，用未触碰的刀与未敲的门制造张力，是“以物写心、以景蓄势”的范本。",
+      "usage_hint": "适合参考用环境细节与物件暗示人物关系、铺垫冲突；避免堆砌意象导致节奏拖沓，或让悬念只停留在氛围而不推进线索。",
+      "scene_type": [
+        "mystery",
+        "emotional",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景",
+        "调查场景"
+      ],
+      "technique": [
+        "foreshadow",
+        "sensory_detail",
+        "show_dont_tell",
+        "contrast"
+      ],
+      "technique_display": [
+        "埋伏笔",
+        "感官描写",
+        "以行动代替说明",
+        "反差"
+      ],
+      "style_tags": [
+        "cinematic",
+        "dark",
+        "lyrical",
+        "restrained",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "电影感",
+        "暗黑",
+        "抒情",
+        "克制",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear",
+        "heartache"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "light",
+        "window",
+        "door"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "灯火",
+        "窗",
+        "门"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.77486,
+      "y": 0.26036,
+      "neighbors": [
+        {
+          "index": 5,
+          "score": 1.0
+        },
+        {
+          "index": 2,
+          "score": 0.945
+        },
+        {
+          "index": 18,
+          "score": 0.945
+        }
+      ],
+      "chapter_title": "第7章 回声"
+    },
+    {
+      "index": 22,
+      "scene_id": 250,
+      "chapter_start": 8,
+      "chapter_end": 8,
+      "text": "第8章 回声\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。",
+      "char_count": 136,
+      "summary": "第8章《回声》中，远处钟声响起，城中灯火渐次熄灭。桌下藏刀，无人触碰却无人忘记。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门。屋内灯亮，窗纸映出踱步人影。门开时，他不问来意，只侧身让路。",
+      "style_summary": "以极简白描和短句营造悬疑与情感张力：钟声、灯火、雨声、刀、窗影等意象层层叠加，不直写心理，却用动作与物件暗示未言明的过往与危险，适合学习留白与氛围控制。",
+      "usage_hint": "适合参考用环境与物件写人物关系、以留白制造悬念；避免堆砌意象导致信息模糊，或让关键道具只作装饰而无后续呼应。",
+      "scene_type": [
+        "emotional",
+        "mystery",
+        "romance"
+      ],
+      "scene_type_display": [
+        "情感场景",
+        "悬疑场景",
+        "感情互动"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "contrast"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "反差"
+      ],
+      "style_tags": [
+        "restrained",
+        "lyrical",
+        "cinematic",
+        "short_sentence",
+        "dark"
+      ],
+      "style_tags_display": [
+        "克制",
+        "抒情",
+        "电影感",
+        "短句",
+        "暗黑"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache",
+        "relief"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "key_images": [
+        "knife",
+        "door",
+        "rain",
+        "light",
+        "night"
+      ],
+      "key_images_display": [
+        "刀",
+        "门",
+        "雨",
+        "灯火",
+        "夜晚"
+      ],
+      "narrative_func": "open",
+      "narrative_func_display": "开篇引入",
+      "x": 0.93401,
+      "y": 0.40934,
+      "neighbors": [
+        {
+          "index": 25,
+          "score": 0.8775
+        },
+        {
+          "index": 16,
+          "score": 0.82
+        },
+        {
+          "index": 18,
+          "score": 0.8173
+        }
+      ],
+      "chapter_title": "第8章 回声"
+    },
+    {
+      "index": 23,
+      "scene_id": 251,
+      "chapter_start": 8,
+      "chapter_end": 8,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。",
+      "char_count": 141,
+      "summary": "第二天，新线索将两人推向同一条窄路。潮湿木头与冷茶气味中，两人沉默对峙。桌角压着一封被剥开火漆的无署名信，她目光触及却停在袖口。他提醒事情比想象中麻烦，她笑称从不怕麻烦。远处钟声响起，城中灯火次第熄灭，气氛愈发压抑。",
+      "style_summary": "以极简对白和克制动作推进，用气味、火漆、钟声、灯火等细节营造悬疑与压迫感；沉默与短句交替，留白充分，是“少即是多”的范本。",
+      "usage_hint": "适合参考用环境细节和留白写对峙、埋线索；避免解释过多或让对白直白交代信息，保持暧昧与节奏。",
+      "scene_type": [
+        "mystery",
+        "dialogue_conflict",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "对话冲突",
+        "情感场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "foreshadow",
+        "hook"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "埋伏笔",
+        "钩子"
+      ],
+      "style_tags": [
+        "restrained",
+        "cinematic",
+        "short_sentence",
+        "dark",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "电影感",
+        "短句",
+        "暗黑",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "light",
+        "night",
+        "fire"
+      ],
+      "key_images_display": [
+        "灯火",
+        "夜晚",
+        "火"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.32183,
+      "y": 0.73741,
+      "neighbors": [
+        {
+          "index": 9,
+          "score": 1.0
+        },
+        {
+          "index": 6,
+          "score": 0.9223
+        },
+        {
+          "index": 20,
+          "score": 0.9223
+        }
+      ],
+      "chapter_title": "第8章 回声"
+    },
+    {
+      "index": 24,
+      "scene_id": 252,
+      "chapter_start": 8,
+      "chapter_end": 8,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。",
+      "char_count": 132,
+      "summary": "第二天，新线索将两人推向同一条窄路。桌下藏着刀，无人触碰却无人忘记。雨敲旧城屋檐，她收伞站在门槛外，没有立刻敲门。屋内灯亮，窗纸映出踱步身影。门开后，他不问来意，只侧身让路。",
+      "style_summary": "以极简动作与物象承载悬念：刀、雨、灯、窗影构成压迫氛围，人物不解释来意，用沉默和让路完成关系推进，是克制叙事的范本。",
+      "usage_hint": "适合参考用环境细节和留白写紧张重逢或线索汇合；避免过度解释心理，保持动作与物象的克制。",
+      "scene_type": [
+        "mystery",
+        "emotional",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "情感场景",
+        "调查场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow",
+        "contrast"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔",
+        "反差"
+      ],
+      "style_tags": [
+        "restrained",
+        "cinematic",
+        "short_sentence",
+        "lyrical"
+      ],
+      "style_tags_display": [
+        "克制",
+        "电影感",
+        "短句",
+        "抒情"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear",
+        "relief"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧",
+        "释然"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "door",
+        "light",
+        "window"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "门",
+        "灯火",
+        "窗"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.57006,
+      "y": 0.0548,
+      "neighbors": [
+        {
+          "index": 8,
+          "score": 1.0
+        },
+        {
+          "index": 2,
+          "score": 0.9278
+        },
+        {
+          "index": 18,
+          "score": 0.9278
+        }
+      ],
+      "chapter_title": "第8章 回声"
+    },
+    {
+      "index": 25,
+      "scene_id": 253,
+      "chapter_start": 9,
+      "chapter_end": 9,
+      "text": "第9章 回声\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。",
+      "char_count": 141,
+      "summary": "第9章《回声》中，旧城雨夜，她收伞站在门外迟迟未敲。屋内灯亮，窗纸映出他踱步的影子。门开后他不问来意，只侧身让路。桌下刀无人触碰却人人记得，潮湿木头与冷茶味弥漫，两人沉默相对，未出口的话如回声般悬在空气里。",
+      "style_summary": "以极简动作与感官细节构建张力：刀、雨、灯影、冷茶皆成潜台词，不写心理却让未言之意回荡。短句克制，留白充足，适合学习用物件和空间关系替代直白抒情。",
+      "usage_hint": "适合参考如何用静物、天气和沉默写暗涌与旧事；避免堆砌解释性内心独白或过早揭开冲突，保持留白。",
+      "scene_type": [
+        "emotional",
+        "mystery",
+        "daily_life"
+      ],
+      "scene_type_display": [
+        "情感场景",
+        "悬疑场景",
+        "日常场景"
+      ],
+      "technique": [
+        "show_dont_tell",
+        "sensory_detail",
+        "foreshadow"
+      ],
+      "technique_display": [
+        "以行动代替说明",
+        "感官描写",
+        "埋伏笔"
+      ],
+      "style_tags": [
+        "restrained",
+        "lyrical",
+        "cinematic",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "克制",
+        "抒情",
+        "电影感",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache",
+        "relief"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "key_images": [
+        "knife",
+        "rain",
+        "door",
+        "light",
+        "window"
+      ],
+      "key_images_display": [
+        "刀",
+        "雨",
+        "门",
+        "灯火",
+        "窗"
+      ],
+      "narrative_func": "open",
+      "narrative_func_display": "开篇引入",
+      "x": 0.6224,
+      "y": 0.32025,
+      "neighbors": [
+        {
+          "index": 22,
+          "score": 0.8775
+        },
+        {
+          "index": 1,
+          "score": 0.8364
+        },
+        {
+          "index": 27,
+          "score": 0.8173
+        }
+      ],
+      "chapter_title": "第9章 回声"
+    },
+    {
+      "index": 26,
+      "scene_id": 254,
+      "chapter_start": 9,
+      "chapter_end": 9,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n桌角压着一封没有署名的信，火漆已经被人剥开。\n\n她看了那封信一眼，指尖却停在袖口，像是忘了下一步。\n\n他说，事情比你想的更麻烦。她笑了一下，说我从来不怕麻烦。\n\n远处传来钟声，城里的灯一盏接一盏暗下去。\n\n刀放在桌下，谁都没有碰，可谁都记得它在那里。",
+      "char_count": 138,
+      "summary": "次日，新线索将两人再次推向同一条窄路。桌角压着一封被剥开火漆的匿名信，她只看一眼便指尖停在袖口，像忘了下一步。他提醒事情比预想更麻烦，她笑称自己从不怕麻烦。远处钟声响起，城中灯火渐暗，桌下的刀无人触碰，却成为两人共同记得的威胁。",
+      "style_summary": "以极简动作和物件承载悬念：匿名信、未碰的刀、渐暗灯火构成克制张力。对话短促，留白充分，适合学习以少胜多、以静写危。",
+      "usage_hint": "适合参考悬疑或情感场景中的留白、道具伏笔与短句节奏；避免过度解释人物心理或补全信息，保持暧昧与压迫感。",
+      "scene_type": [
+        "mystery",
+        "dialogue_conflict",
+        "emotional"
+      ],
+      "scene_type_display": [
+        "悬疑场景",
+        "对话冲突",
+        "情感场景"
+      ],
+      "technique": [
+        "foreshadow",
+        "show_dont_tell",
+        "sensory_detail"
+      ],
+      "technique_display": [
+        "埋伏笔",
+        "以行动代替说明",
+        "感官描写"
+      ],
+      "style_tags": [
+        "restrained",
+        "short_sentence",
+        "cinematic",
+        "dark"
+      ],
+      "style_tags_display": [
+        "克制",
+        "短句",
+        "电影感",
+        "暗黑"
+      ],
+      "emotion_tags": [
+        "tension",
+        "fear"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "恐惧"
+      ],
+      "key_images": [
+        "knife",
+        "light",
+        "night"
+      ],
+      "key_images_display": [
+        "刀",
+        "灯火",
+        "夜晚"
+      ],
+      "narrative_func": "advance",
+      "narrative_func_display": "推进剧情",
+      "x": 0.55597,
+      "y": 0.8869,
+      "neighbors": [
+        {
+          "index": 12,
+          "score": 1.0
+        },
+        {
+          "index": 9,
+          "score": 0.9078
+        },
+        {
+          "index": 23,
+          "score": 0.9078
+        }
+      ],
+      "chapter_title": "第9章 回声"
+    },
+    {
+      "index": 27,
+      "scene_id": 255,
+      "chapter_start": 9,
+      "chapter_end": 9,
+      "text": "第二天，新的线索又把两个人推向同一条窄路。\n\n雨落在旧城的屋檐上，像一层薄薄的铁皮被反复敲响。\n\n她把伞收起来，站在门槛外，没有立刻敲门。\n\n屋里的灯亮着，窗纸上映出一个来回踱步的影子。\n\n门开时，他没有问她为什么来，只侧身让出一条路。\n\n空气里有潮湿木头和冷茶的味道，两个人都没有先开口。",
+      "char_count": 135,
+      "summary": "第二天，新线索让两人再次走向同一条窄路。雨落旧城屋檐，她收伞站在门槛外，迟疑未敲。屋内灯亮，窗纸映出踱步人影。门开，他不问来意，只侧身让路。潮湿木头与冷茶气味中，两人沉默相对，谁也没有先开口。",
+      "style_summary": "以雨声、灯影、气味等感官细节铺陈氛围，用收伞、不敲门、侧身让路等动作替代对白，留白克制，暗示默契与未言明的紧张，是show_dont_tell与节奏控制的范本。",
+      "usage_hint": "适合参考用环境细节与人物微动作写重逢、对峙或合作前奏；避免意象堆砌和过度解释关系，留白须服务线索推进与人物张力。",
+      "scene_type": [
+        "emotional",
+        "mystery",
+        "investigation"
+      ],
+      "scene_type_display": [
+        "情感场景",
+        "悬疑场景",
+        "调查场景"
+      ],
+      "technique": [
+        "sensory_detail",
+        "show_dont_tell",
+        "contrast",
+        "rhythm_shift"
+      ],
+      "technique_display": [
+        "感官描写",
+        "以行动代替说明",
+        "反差",
+        "节奏变化"
+      ],
+      "style_tags": [
+        "restrained",
+        "lyrical",
+        "cinematic",
+        "short_sentence"
+      ],
+      "style_tags_display": [
+        "克制",
+        "抒情",
+        "电影感",
+        "短句"
+      ],
+      "emotion_tags": [
+        "tension",
+        "heartache",
+        "relief"
+      ],
+      "emotion_tags_display": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "key_images": [
+        "rain",
+        "door",
+        "light",
+        "window"
+      ],
+      "key_images_display": [
+        "雨",
+        "门",
+        "灯火",
+        "窗"
+      ],
+      "narrative_func": "transition",
+      "narrative_func_display": "过场衔接",
+      "x": 0.30306,
+      "y": 0.0,
+      "neighbors": [
+        {
+          "index": 11,
+          "score": 1.0
+        },
+        {
+          "index": 8,
+          "score": 0.9144
+        },
+        {
+          "index": 24,
+          "score": 0.9144
+        }
+      ],
+      "chapter_title": "第9章 回声"
+    }
+  ],
+  "stats": {
+    "scene_type": [
+      {
+        "name": "悬疑场景",
+        "count": 27
+      },
+      {
+        "name": "情感场景",
+        "count": 27
+      },
+      {
+        "name": "对话冲突",
+        "count": 15
+      },
+      {
+        "name": "调查场景",
+        "count": 9
+      },
+      {
+        "name": "感情互动",
+        "count": 1
+      },
+      {
+        "name": "日常场景",
+        "count": 1
+      }
+    ],
+    "technique": [
+      {
+        "name": "以行动代替说明",
+        "count": 27
+      },
+      {
+        "name": "感官描写",
+        "count": 27
+      },
+      {
+        "name": "埋伏笔",
+        "count": 25
+      },
+      {
+        "name": "反差",
+        "count": 14
+      },
+      {
+        "name": "钩子",
+        "count": 10
+      },
+      {
+        "name": "节奏变化",
+        "count": 2
+      }
+    ],
+    "style": [
+      {
+        "name": "电影感",
+        "count": 27
+      },
+      {
+        "name": "克制",
+        "count": 27
+      },
+      {
+        "name": "短句",
+        "count": 27
+      },
+      {
+        "name": "抒情",
+        "count": 23
+      },
+      {
+        "name": "暗黑",
+        "count": 18
+      }
+    ],
+    "emotion": [
+      {
+        "name": "紧张",
+        "count": 27
+      },
+      {
+        "name": "恐惧",
+        "count": 19
+      },
+      {
+        "name": "心痛",
+        "count": 12
+      },
+      {
+        "name": "释然",
+        "count": 6
+      }
+    ],
+    "image": [
+      {
+        "name": "灯火",
+        "count": 25
+      },
+      {
+        "name": "门",
+        "count": 20
+      },
+      {
+        "name": "雨",
+        "count": 16
+      },
+      {
+        "name": "刀",
+        "count": 15
+      },
+      {
+        "name": "窗",
+        "count": 13
+      },
+      {
+        "name": "夜晚",
+        "count": 13
+      },
+      {
+        "name": "火",
+        "count": 5
+      }
+    ],
+    "narrative": [
+      {
+        "name": "推进剧情",
+        "count": 15
+      },
+      {
+        "name": "开篇引入",
+        "count": 7
+      },
+      {
+        "name": "过场衔接",
+        "count": 3
+      },
+      {
+        "name": "制造冲突",
+        "count": 2
+      }
+    ]
+  },
+  "version_diff": [
+    {
+      "index": 1,
+      "chapter_start": 1,
+      "chapter_end": 1,
+      "before_narrative": "开篇引入",
+      "after_narrative": "开篇引入",
+      "before_emotions": [
+        "紧张",
+        "心痛",
+        "恐惧"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "恐惧"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "chapter_start": 1,
+      "chapter_end": 1,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "节奏变化"
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "chapter_start": 1,
+      "chapter_end": 1,
+      "before_narrative": "推进剧情",
+      "after_narrative": "开篇引入",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": "暗黑"
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "恐惧"
+        },
+        {
+          "field": "叙事功能",
+          "added": "o、p",
+          "removed": "a、c、d、v"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "chapter_start": 2,
+      "chapter_end": 2,
+      "before_narrative": "揭示信息",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "情绪标签",
+          "added": "心痛",
+          "removed": ""
+        },
+        {
+          "field": "叙事功能",
+          "added": "c、d、n",
+          "removed": "l、r"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "chapter_start": 2,
+      "chapter_end": 2,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "恐惧",
+        "紧张"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "情绪标签",
+          "added": "心痛",
+          "removed": ""
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "chapter_start": 2,
+      "chapter_end": 2,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "恐惧",
+          "removed": ""
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "chapter_start": 3,
+      "chapter_end": 3,
+      "before_narrative": "开篇引入",
+      "after_narrative": "制造冲突",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        },
+        {
+          "field": "叙事功能",
+          "added": "c、f、i、l、t",
+          "removed": "e、p"
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "chapter_start": 3,
+      "chapter_end": 3,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧",
+        "释然"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "钩子"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "暗黑"
+        },
+        {
+          "field": "情绪标签",
+          "added": "释然",
+          "removed": "心痛"
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "chapter_start": 3,
+      "chapter_end": 3,
+      "before_narrative": "开篇引入",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        },
+        {
+          "field": "叙事功能",
+          "added": "a、c、d、v",
+          "removed": "o、p"
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "chapter_start": 4,
+      "chapter_end": 4,
+      "before_narrative": "制造冲突",
+      "after_narrative": "制造冲突",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "chapter_start": 4,
+      "chapter_end": 4,
+      "before_narrative": "推进剧情",
+      "after_narrative": "过场衔接",
+      "before_emotions": [
+        "紧张",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "埋伏笔"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "暗黑"
+        },
+        {
+          "field": "情绪标签",
+          "added": "释然",
+          "removed": ""
+        },
+        {
+          "field": "叙事功能",
+          "added": "i、o、r、s、t",
+          "removed": "c、d、e、v"
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "chapter_start": 4,
+      "chapter_end": 4,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "写作技法",
+          "added": "",
+          "removed": "钩子"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "抒情"
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "chapter_start": 5,
+      "chapter_end": 5,
+      "before_narrative": "开篇引入",
+      "after_narrative": "过场衔接",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "节奏变化"
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        },
+        {
+          "field": "叙事功能",
+          "added": "a、i、r、s、t",
+          "removed": "e、p"
+        }
+      ]
+    },
+    {
+      "index": 14,
+      "chapter_start": 5,
+      "chapter_end": 5,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "心痛",
+        "恐惧"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "钩子",
+          "removed": "节奏变化"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "抒情"
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "恐惧"
+        }
+      ]
+    },
+    {
+      "index": 15,
+      "chapter_start": 5,
+      "chapter_end": 5,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "节奏变化"
+        },
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        }
+      ]
+    },
+    {
+      "index": 16,
+      "chapter_start": 6,
+      "chapter_end": 6,
+      "before_narrative": "制造冲突",
+      "after_narrative": "开篇引入",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "节奏变化"
+        },
+        {
+          "field": "叙事功能",
+          "added": "e、p",
+          "removed": "c、f、i、l、t"
+        }
+      ]
+    },
+    {
+      "index": 17,
+      "chapter_start": 6,
+      "chapter_end": 6,
+      "before_narrative": "推进剧情",
+      "after_narrative": "开篇引入",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": "暗黑"
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "恐惧"
+        },
+        {
+          "field": "叙事功能",
+          "added": "o、p",
+          "removed": "a、c、d、v"
+        }
+      ]
+    },
+    {
+      "index": 18,
+      "chapter_start": 6,
+      "chapter_end": 6,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "节奏变化"
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "chapter_start": 7,
+      "chapter_end": 7,
+      "before_narrative": "制造冲突",
+      "after_narrative": "开篇引入",
+      "before_emotions": [
+        "恐惧",
+        "心痛",
+        "紧张"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        },
+        {
+          "field": "叙事功能",
+          "added": "e、p",
+          "removed": "c、f、i、l、t"
+        }
+      ]
+    },
+    {
+      "index": 20,
+      "chapter_start": 7,
+      "chapter_end": 7,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "恐惧",
+          "removed": ""
+        }
+      ]
+    },
+    {
+      "index": 21,
+      "chapter_start": 7,
+      "chapter_end": 7,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "恐惧",
+        "紧张"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "changes": [
+        {
+          "field": "情绪标签",
+          "added": "心痛",
+          "removed": ""
+        }
+      ]
+    },
+    {
+      "index": 22,
+      "chapter_start": 8,
+      "chapter_end": 8,
+      "before_narrative": "开篇引入",
+      "after_narrative": "开篇引入",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "感情互动",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "释然",
+          "removed": "恐惧"
+        }
+      ]
+    },
+    {
+      "index": 23,
+      "chapter_start": 8,
+      "chapter_end": 8,
+      "before_narrative": "开篇引入",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "风格标签",
+          "added": "抒情",
+          "removed": ""
+        },
+        {
+          "field": "情绪标签",
+          "added": "",
+          "removed": "心痛"
+        },
+        {
+          "field": "叙事功能",
+          "added": "a、c、d、v",
+          "removed": "o、p"
+        }
+      ]
+    },
+    {
+      "index": 24,
+      "chapter_start": 8,
+      "chapter_end": 8,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧",
+        "释然"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "钩子"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "暗黑"
+        },
+        {
+          "field": "情绪标签",
+          "added": "释然",
+          "removed": "心痛"
+        }
+      ]
+    },
+    {
+      "index": 25,
+      "chapter_start": 9,
+      "chapter_end": 9,
+      "before_narrative": "制造冲突",
+      "after_narrative": "开篇引入",
+      "before_emotions": [
+        "紧张",
+        "恐惧",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "日常场景",
+          "removed": "对话冲突"
+        },
+        {
+          "field": "写作技法",
+          "added": "",
+          "removed": "节奏变化"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "暗黑"
+        },
+        {
+          "field": "情绪标签",
+          "added": "释然",
+          "removed": "恐惧"
+        },
+        {
+          "field": "叙事功能",
+          "added": "e、p",
+          "removed": "c、f、i、l、t"
+        }
+      ]
+    },
+    {
+      "index": 26,
+      "chapter_start": 9,
+      "chapter_end": 9,
+      "before_narrative": "推进剧情",
+      "after_narrative": "推进剧情",
+      "before_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "after_emotions": [
+        "紧张",
+        "恐惧"
+      ],
+      "changes": [
+        {
+          "field": "场景类型",
+          "added": "情感场景",
+          "removed": "调查场景"
+        },
+        {
+          "field": "写作技法",
+          "added": "",
+          "removed": "钩子"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "抒情"
+        }
+      ]
+    },
+    {
+      "index": 27,
+      "chapter_start": 9,
+      "chapter_end": 9,
+      "before_narrative": "推进剧情",
+      "after_narrative": "过场衔接",
+      "before_emotions": [
+        "紧张",
+        "心痛"
+      ],
+      "after_emotions": [
+        "紧张",
+        "心痛",
+        "释然"
+      ],
+      "changes": [
+        {
+          "field": "写作技法",
+          "added": "反差",
+          "removed": "埋伏笔"
+        },
+        {
+          "field": "风格标签",
+          "added": "",
+          "removed": "暗黑"
+        },
+        {
+          "field": "情绪标签",
+          "added": "释然",
+          "removed": ""
+        },
+        {
+          "field": "叙事功能",
+          "added": "i、o、r、s、t",
+          "removed": "c、d、e、v"
+        }
+      ]
+    }
+  ]
+};

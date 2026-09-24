@@ -27,3 +27,6 @@ app/data/tag_vocab/*
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Browser profiles and screenshots generated while validating the demo
+demo/shots/

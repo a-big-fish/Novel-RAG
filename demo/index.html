@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>笔阵 · 拆书数据查看器</title>
+<style>
+  :root{
+    --paper:#F7F6F2;
+    --paper-warm:#FCFBF8;
+    --ink:#201E1B;
+    --muted:#8B857B;
+    --line:#E4E0D8;
+    --cinnabar:#B3402A;
+    --sage:#5F7A61;
+    --amber:#B88A44;
+    --serif:"Noto Serif SC","Source Han Serif SC",SimSun,Georgia,serif;
+    --sans:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{font-size:16px;-webkit-text-size-adjust:100%}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6}
+  ::selection{background:rgba(179,64,42,.18)}
+  button{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--cinnabar);outline-offset:2px}
+
+  /* ── 顶栏 ───────────────────────────── */
+  .top{display:flex;align-items:center;gap:2rem;padding:0 2.4rem;height:64px;
+       border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:20}
+  .brand{display:flex;align-items:baseline;gap:.7rem;font-family:var(--serif);
+         font-size:1.15rem;font-weight:700;white-space:nowrap}
+  .seal{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+        background:var(--cinnabar);color:#fff;border-radius:3px;font-size:1.05rem;
+        transform:translateY(6px);font-weight:600}
+  .brand .sub{font-family:var(--sans);font-size:.78rem;font-weight:400;color:var(--muted)}
+  .srcbar{margin-left:auto;display:flex;align-items:center;gap:1.1rem;font-size:.78rem;
+          color:var(--muted);flex-wrap:wrap;justify-content:flex-end}
+  .live{display:inline-flex;align-items:center;gap:.4rem}
+  .live::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--sage)}
+
+  main{max-width:1240px;margin:0 auto;padding:0 2.4rem 3.5rem}
+
+  /* ── 概览条 ─────────────────────────── */
+  .strip{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);
+         border-bottom:1px solid var(--line);margin:0 -2.4rem 2.4rem}
+  .cell{background:var(--paper);padding:1.15rem 1.4rem 1.05rem}
+  .cell .lab{font-size:.76rem;color:var(--muted);margin-bottom:.25rem}
+  .cell .num{font-family:var(--serif);font-size:1.5rem;font-weight:700;line-height:1.25}
+  .cell .num small{font-family:var(--sans);font-size:.76rem;color:var(--muted);
+                   font-weight:400;margin-left:.28rem}
+  .cell .num.accent{color:var(--cinnabar)}
+
+  /* ── 工作区 ─────────────────────────── */
+  .workspace{display:grid;grid-template-columns:246px minmax(0,1fr) 306px;
+             border:1px solid var(--line);background:#fff;min-height:600px}
+  .col{padding:1.25rem 0;max-height:760px;overflow:auto}
+  .col+.col{border-left:1px solid var(--line)}
+  .colhd{font-size:.74rem;letter-spacing:.12em;color:var(--muted);font-weight:400;
+         padding:0 1.25rem .7rem}
+
+  .chgroup{border-top:1px solid var(--line)}
+  .chgroup:first-child{border-top:0}
+  .chgroup summary{display:flex;align-items:baseline;gap:.5rem;cursor:pointer;list-style:none;
+                   padding:.62rem 1.25rem;font-size:.85rem}
+  .chgroup summary::-webkit-details-marker{display:none}
+  .chgroup summary::before{content:"+";font-size:.72rem;color:var(--muted);flex:none}
+  .chgroup[open] summary::before{content:"-"}
+  .chgroup summary:hover{background:var(--paper)}
+  .chgroup .chname{font-family:var(--serif);font-weight:700}
+  .chgroup summary .cc{margin-left:auto;font-size:.73rem;color:var(--muted);flex:none}
+  .sc{display:flex;align-items:baseline;gap:.55rem;width:100%;text-align:left;border:0;
+      background:none;cursor:pointer;padding:.4rem 1.25rem .4rem 2rem;font-size:.82rem;
+      border-left:2px solid transparent;color:var(--ink)}
+  .sc:hover{background:var(--paper)}
+  .sc.on{background:var(--paper);border-left-color:var(--cinnabar);font-weight:600}
+  .sc .n{font-family:var(--serif);color:var(--muted);font-size:.78rem;min-width:1.1em}
+  .sc.on .n{color:var(--cinnabar)}
+  .sc .lab{color:var(--muted);font-size:.76rem;margin-left:auto;flex:none}
+  .sc.on .lab{color:var(--ink)}
+
+  .reader{padding:1.5rem 2.4rem 2rem;max-height:760px;overflow:auto}
+  .rhead{display:flex;align-items:baseline;gap:.9rem;flex-wrap:wrap;
+         padding-bottom:1rem;border-bottom:1px solid var(--line)}
+  .rhead h2{font-family:var(--serif);font-size:1.28rem;font-weight:700}
+  .rhead .meta{font-size:.78rem;color:var(--muted)}
+  .toggle{margin-left:auto;display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;
+          color:var(--muted);cursor:pointer;user-select:none}
+  .toggle input{accent-color:var(--sage);width:14px;height:14px}
+  .passage{margin:1.6rem 0 0}
+  .passage .chap{font-size:.78rem;color:var(--muted);letter-spacing:.12em;margin-bottom:1.1rem}
+  .passage p{font-family:var(--serif);font-size:1.02rem;line-height:2.1;text-indent:2em;
+             margin-bottom:.75em;max-width:34em}
+  .passage em{font-style:normal;background:rgba(95,122,97,.13);
+              box-shadow:inset 0 -.55em rgba(95,122,97,.13);padding:0 .1em}
+  .anno{margin-top:2.2rem;padding-top:1.4rem;border-top:1px solid var(--line)}
+  .anno h3{font-size:.74rem;letter-spacing:.12em;color:var(--muted);font-weight:400;
+           margin-bottom:1rem}
+  .anno .sum{font-size:.94rem;line-height:1.95;max-width:40em}
+  .anno dl{margin-top:1.3rem;display:grid;gap:.85rem}
+  .anno dt{font-size:.76rem;color:var(--cinnabar);margin-bottom:.2rem}
+  .anno dd{font-size:.9rem;line-height:1.9;color:#3A3733;max-width:40em}
+  .tagrow{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:1.4rem}
+  .tag{border:1px solid var(--line);background:var(--paper);border-radius:999px;
+       padding:.2rem .75rem;font-size:.78rem}
+  .tag.k{border-color:rgba(95,122,97,.5);color:#41573F;background:rgba(95,122,97,.06)}
+
+  .aside{padding:1.25rem 1.4rem 2rem;background:var(--paper-warm);max-height:760px;overflow:auto}
+  .aside h3{font-size:.74rem;letter-spacing:.12em;color:var(--muted);font-weight:400;
+            margin-bottom:.9rem}
+  .aside h3.gap{margin-top:2rem}
+  .nb{display:flex;align-items:baseline;gap:.6rem;width:100%;border:0;background:none;
+      cursor:pointer;text-align:left;padding:.45rem 0;border-bottom:1px solid var(--line);
+      font-size:.85rem}
+  .nb:hover .nbt{color:var(--cinnabar)}
+  .nb .nbt{font-family:var(--serif);font-weight:700;flex:none}
+  .nb .nbd{color:var(--muted);font-size:.78rem;overflow:hidden;text-overflow:ellipsis;
+           white-space:nowrap;flex:1}
+  .nb .nbs{font-size:.74rem;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+  .diff{border-bottom:1px solid var(--line);padding:.5rem 0 .7rem;font-size:.82rem}
+  .diff .dh{display:flex;align-items:baseline;gap:.5rem}
+  .diff .dh b{font-family:var(--serif);font-size:.9rem}
+  .diff .dh span{font-size:.74rem;color:var(--muted);margin-left:auto}
+  .diff .row{display:flex;gap:.5rem;margin-top:.35rem;align-items:baseline}
+  .diff .fk{color:var(--muted);font-size:.76rem;flex:none;width:4.6em}
+  .diff .plus{color:var(--sage)}
+  .diff .minus{color:var(--cinnabar)}
+  .diff .none{color:var(--muted)}
+
+  /* ── 向量星图 ───────────────────────── */
+  .low{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:1.4rem;margin-top:1.4rem}
+  .sky{background:var(--ink);border:1px solid var(--ink);padding:1.1rem 1.4rem 1.4rem;
+       display:flex;flex-direction:column}
+  .sky .hd{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:.4rem}
+  .sky h3{font-family:var(--serif);font-size:1rem;font-weight:700;color:var(--paper)}
+  .sky .hd p{font-size:.76rem;color:#8E887E}
+  .legend{margin-left:auto;display:flex;gap:.9rem;flex-wrap:wrap;font-size:.74rem;color:#A8A29A}
+  .legend span{display:inline-flex;align-items:center;gap:.35rem}
+  .legend i{width:8px;height:8px;border-radius:50%;flex:none}
+  svg#skyplot{display:block;width:100%;height:auto;margin-top:.2rem}
+  #skyplot .pt{cursor:pointer;transition:r .12s ease}
+  #skyplot .pt:hover{stroke:#F7F6F2;stroke-width:2}
+  #skyplot .lab{font-family:var(--sans);font-size:11px;fill:#CFCAC2;pointer-events:none}
+  #skyplot .gridline{stroke:rgba(247,246,242,.09);stroke-width:1}
+  #skyplot .link{stroke:rgba(179,64,42,.55);stroke-width:1.2;stroke-dasharray:3 4}
+  #skyplot .ring{fill:none;stroke:#B3402A;stroke-width:1.4;opacity:.85}
+  .sky .foot{margin-top:.9rem;font-size:.75rem;color:#8E887E;line-height:1.7}
+  .sky .foot b{color:#D8D3CB;font-weight:600}
+
+  .pipe{border:1px solid var(--line);background:#fff;padding:1.1rem 1.3rem 1.3rem}
+  .pipe h3{font-size:.74rem;letter-spacing:.12em;color:var(--muted);font-weight:400;
+           margin-bottom:1rem}
+  .pstage{display:flex;align-items:baseline;gap:.7rem;padding:.5rem 0;
+          border-bottom:1px solid var(--line)}
+  .pstage:last-of-type{border-bottom:0}
+  .pstage .k{font-size:.75rem;color:var(--muted);width:1.2em;flex:none;
+             font-variant-numeric:tabular-nums}
+  .pstage .nm{font-family:var(--serif);font-weight:700;font-size:.9rem}
+  .pstage .en{font-size:.72rem;color:var(--muted);margin-left:.4rem}
+  .pstage .st{margin-left:auto;font-size:.75rem;color:var(--sage);flex:none}
+  .runs{margin-top:1.1rem;border-top:1px solid var(--line);padding-top:.9rem;
+        font-size:.8rem;line-height:1.85;color:#3A3733}
+  .runs .rh{font-size:.74rem;color:var(--muted);letter-spacing:.12em;margin-bottom:.5rem}
+  .runs .kv{display:flex;justify-content:space-between;gap:1rem}
+  .runs .kv span:last-child{font-variant-numeric:tabular-nums}
+
+  /* ── 标签统计 ───────────────────────── */
+  .tally{margin-top:2.6rem}
+  .tally>h3{font-size:.74rem;letter-spacing:.12em;color:var(--muted);font-weight:400;
+            padding-bottom:.7rem;border-bottom:1px solid var(--line)}
+  .tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:0 2.4rem}
+  .tgroup{padding:1.1rem 0 1.4rem}
+  .tgroup h4{font-family:var(--serif);font-size:.92rem;font-weight:700;margin-bottom:.7rem}
+  .trow{display:flex;align-items:center;gap:.55rem;padding:.16rem 0;font-size:.8rem}
+  .trow .tn{flex:none;min-width:5.4em;color:#3A3733;white-space:nowrap;overflow:hidden;
+            text-overflow:ellipsis}
+  .trow .tb{flex:1;height:3px;background:#ECE9E2;position:relative;min-width:2rem}
+  .trow .tb i{position:absolute;inset:0 auto 0 0;display:block;background:var(--ink)}
+  .trow .tc{flex:none;font-size:.74rem;color:var(--muted);width:2em;text-align:right;
+            font-variant-numeric:tabular-nums}
+
+  /* ── 出处 ───────────────────────────── */
+  .prov{margin-top:2.6rem;padding-top:1.2rem;border-top:1px solid var(--line);
+        display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.5rem 2.4rem;
+        font-size:.78rem;color:var(--muted);line-height:1.8}
+  .prov b{color:var(--ink);font-weight:600}
+  .prov code{font-family:Consolas,monospace;font-size:.74rem;color:#3A3733}
+
+  @media (max-width:1080px){
+    .workspace{grid-template-columns:220px minmax(0,1fr)}
+    .aside{grid-column:1/-1;border-left:0;border-top:1px solid var(--line);
+           display:grid;grid-template-columns:1fr 1fr;gap:0 2.4rem}
+    .aside h3.gap{margin-top:0}
+    .low{grid-template-columns:1fr}
+    .strip{grid-template-columns:repeat(3,1fr)}
+  }
+  @media (max-width:760px){
+    .top{height:auto;padding:.7rem 1.2rem;flex-wrap:wrap;gap:.6rem}
+    .srcbar{margin-left:0;width:100%;justify-content:flex-start}
+    main{padding:0 1.2rem 2.5rem}
+    .strip{margin:0 -1.2rem 1.6rem;grid-template-columns:repeat(2,1fr)}
+    .workspace{grid-template-columns:1fr}
+    .col{border-left:0!important;border-bottom:1px solid var(--line);max-height:none}
+    .reader,.aside{max-height:none}
+    .reader{padding:1.2rem 1.2rem 1.6rem}
+    .aside{grid-column:auto;display:block}
+    .cell{padding:.9rem 1rem}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #skyplot .pt{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><span class="seal">阵</span>笔阵<span class="sub">拆书数据查看器</span></div>
+  <div class="srcbar">
+    <span class="live">真实数据快照</span>
+    <span>Qdrant · PostgreSQL</span>
+    <span id="stamp">—</span>
+  </div>
+</header>
+
+<main>
+  <section class="strip" id="strip" aria-label="样本概览"></section>
+
+  <section class="workspace" aria-label="场景与标注">
+    <nav class="col" aria-label="章节与场景索引">
+      <div class="colhd">章节 · 场景</div>
+      <div id="chlist"></div>
+    </nav>
+
+    <div class="col reader" id="reader" aria-live="polite"></div>
+
+    <aside class="col aside" id="aside"></aside>
+  </section>
+
+  <section class="low">
+    <div class="sky">
+      <div class="hd">
+        <h3>向量星图</h3>
+        <p>27 个场景 · summary-dense 1024 维 → PCA 二维投影</p>
+        <div class="legend" id="legend"></div>
+      </div>
+      <svg id="skyplot" viewBox="0 0 1000 400" role="group"
+           aria-label="场景向量分布，点击圆点切换场景"></svg>
+      <p class="foot" id="skyfoot"></p>
+    </div>
+
+    <div class="pipe">
+      <h3>管线运行</h3>
+      <div id="pipeline"></div>
+      <div class="runs" id="runs"></div>
+    </div>
+  </section>
+
+  <section class="tally">
+    <h3>标注标签分布 · 全样本</h3>
+    <div class="tgrid" id="tally"></div>
+  </section>
+
+  <footer class="prov" id="prov"></footer>
+</main>
+
+<script src="./data.js"></script>
+<script>
+(function(){
+  "use strict";
+  var DATA = window.BIZHEN_DEMO;
+  if (!DATA) {
+    document.querySelector("main").innerHTML =
+      "<p style='padding:2rem 0'>未找到 data.js，请先运行 uv run python demo/export_demo_data.py</p>";
+    return;
+  }
+
+  var SCENES = DATA.scenes;
+  var CHAPTERS = DATA.chapters;
+  var BY_ID = {};
+  var DIFF = {};
+  SCENES.forEach(function (s) { BY_ID[s.index] = s; });
+  DATA.version_diff.forEach(function (d) { DIFF[d.index] = d; });
+  var current = 1;
+
+  var FUNC_COLOR = {
+    "开篇引入": "#D9A05B",
+    "推进剧情": "#8FAE90",
+    "过场衔接": "#9A948A",
+    "制造冲突": "#C9553A"
+  };
+  var STAGE_CN = {
+    prepare_text: "解析文本",
+    split: "切分场景",
+    annotate: "标注场景",
+    embed: "生成向量",
+    sync: "写入向量库"
+  };
+  var STAGE_ORDER = ["prepare_text", "split", "annotate", "embed", "sync"];
+
+  function esc(value){
+    return String(value).replace(/[&<>"]/g, function (c){
+      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;" }[c];
+    });
+  }
+  function colorOf(name){ return FUNC_COLOR[name] || "#8FAE90"; }
+  function chapterOf(index){
+    for (var i = 0; i < CHAPTERS.length; i++) {
+      if (CHAPTERS[i].index === index) return CHAPTERS[i];
+    }
+    return null;
+  }
+
+  /* 意象高亮：先按原始文本切词，再逐个转义，避免插入标签被二次匹配 */
+  function highlight(paragraph, words){
+    if (!words.length) return esc(paragraph);
+    var sorted = words.slice().sort(function (a, b){ return b.length - a.length; });
+    var pattern = sorted.map(function (w){
+      return w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }).join("|");
+    return paragraph.split(new RegExp("(" + pattern + ")", "g")).map(function (token){
+      return sorted.indexOf(token) >= 0 ? "<em>" + esc(token) + "</em>" : esc(token);
+    }).join("");
+  }
+
+  /* ── 概览条 ────────────────────────────────────────── */
+  function renderStrip(){
+    var d = DATA.dataset;
+    var changed = DATA.version_diff.filter(function (v){ return v.changes.length; }).length;
+    var cells = [
+      { lab: "样本章节", num: d.chapters, unit: "章" },
+      { lab: "切分场景", num: d.scenes, unit: "场景" },
+      { lab: "向量点位", num: d.points, unit: "点 · " + d.collection_status },
+      { lab: "向量通道", num: d.vectors.dense.length + d.vectors.sparse.length,
+        unit: "稠密 " + d.vectors.dense.length + " · 稀疏 " + d.vectors.sparse.length },
+      { lab: "稠密维度", num: d.vector_dimension, unit: "dim" },
+      { lab: "v1 → v2 重标注", num: changed + "/" + DATA.version_diff.length,
+        unit: "场景标注有变化", accent: true }
+    ];
+    document.getElementById("strip").innerHTML = cells.map(function (c){
+      return '<div class="cell"><div class="lab">' + esc(c.lab) + '</div>' +
+             '<div class="num' + (c.accent ? " accent" : "") + '">' + esc(c.num) +
+             '<small>' + esc(c.unit) + '</small></div></div>';
+    }).join("");
+    document.getElementById("stamp").textContent =
+      "导出 " + DATA.generated_at.replace("T", " ");
+  }
+
+  /* ── 章节索引 ──────────────────────────────────────── */
+  function renderChapters(){
+    document.getElementById("chlist").innerHTML = CHAPTERS.map(function (ch){
+      var items = ch.scene_indexes.map(function (i){
+        var s = BY_ID[i];
+        return '<button class="sc" type="button" data-i="' + i + '">' +
+               '<span class="n">' + i + '</span>' +
+               '<span>' + esc(s.narrative_func_display) + '</span>' +
+               '<span class="lab">' + esc(s.char_count) + ' 字</span></button>';
+      }).join("");
+      return '<details class="chgroup" open><summary>' +
+             '<span class="chname">' + esc(ch.title) + '</span>' +
+             '<span class="cc">' + esc(ch.char_count) + ' 字 · ' +
+             esc(ch.scene_count) + ' 场景</span></summary>' + items + '</details>';
+    }).join("");
+  }
+
+  function markActiveScene(){
+    var nodes = document.querySelectorAll("#chlist .sc");
+    for (var i = 0; i < nodes.length; i++) {
+      var on = Number(nodes[i].getAttribute("data-i")) === current;
+      nodes[i].classList.toggle("on", on);
+      if (on) nodes[i].setAttribute("aria-current", "true");
+      else nodes[i].removeAttribute("aria-current");
+    }
+  }
+
+  /* ── 正文与标注 ────────────────────────────────────── */
+  function renderReader(){
+    var s = BY_ID[current];
+    var ch = chapterOf(s.chapter_start);
+    var lines = s.text.split(/\n+/).map(function (t){ return t.trim(); })
+                      .filter(function (t){ return t.length; });
+    var chapLine = lines.length && ch && lines[0] === ch.title ? lines.shift() : "";
+    var body = lines.map(function (p){
+      return "<p>" + highlight(p, s.key_images_display) + "</p>";
+    }).join("");
+
+    var tagGroups = [
+      { lab: "场景类型", values: s.scene_type_display, key: false },
+      { lab: "写作技法", values: s.technique_display, key: false },
+      { lab: "风格", values: s.style_tags_display, key: false },
+      { lab: "情绪", values: s.emotion_tags_display, key: false },
+      { lab: "意象", values: s.key_images_display, key: true },
+      { lab: "叙事功能", values: [s.narrative_func_display], key: false }
+    ];
+    var tags = tagGroups.map(function (g){
+      return g.values.map(function (v){
+        return '<span class="tag' + (g.key ? " k" : "") + '">' +
+               esc(g.lab) + ' · ' + esc(v) + '</span>';
+      }).join("");
+    }).join("");
+
+    document.getElementById("reader").innerHTML =
+      '<div class="rhead">' +
+        '<h2>场景 ' + s.index + ' · ' + esc(s.narrative_func_display) + '</h2>' +
+        '<span class="meta">' + esc(s.char_count) + ' 字 · 第 ' +
+          esc(s.chapter_start) + ' 章 · 场景 ' + s.index + '/' + SCENES.length + '</span>' +
+        '<label class="toggle"><input type="checkbox" id="hl" checked>意象高亮</label>' +
+      '</div>' +
+      '<article class="passage">' +
+        (chapLine ? '<div class="chap">' + esc(chapLine) + '</div>' : "") + body +
+      '</article>' +
+      '<section class="anno">' +
+        '<h3>模型标注</h3>' +
+        '<p class="sum">' + esc(s.summary) + '</p>' +
+        '<dl>' +
+          '<div><dt>风格提示</dt><dd>' + esc(s.style_summary) + '</dd></div>' +
+          '<div><dt>使用建议</dt><dd>' + esc(s.usage_hint) + '</dd></div>' +
+        '</dl>' +
+        '<div class="tagrow">' + tags + '</div>' +
+      '</section>';
+
+    var box = document.getElementById("hl");
+    box.addEventListener("change", function (){
+      var ps = document.querySelectorAll("#reader .passage p");
+      var raw = lines;
+      for (var i = 0; i < ps.length; i++) {
+        ps[i].innerHTML = box.checked ? highlight(raw[i], s.key_images_display) : esc(raw[i]);
+      }
+    });
+  }
+
+  /* ── 侧栏：相似场景 + 版本差异 ─────────────────────── */
+  function renderAside(){
+    var s = BY_ID[current];
+    var diff = DIFF[current];
+    var near = s.neighbors.map(function (n){
+      var t = BY_ID[n.index];
+      return '<button class="nb" type="button" data-i="' + t.index + '">' +
+             '<span class="nbt">' + t.index + '</span>' +
+             '<span class="nbd">' + esc(t.summary.slice(0, 22)) + '…</span>' +
+             '<span class="nbs">' + n.score.toFixed(3) + '</span></button>';
+    }).join("");
+
+    var changes = diff.changes.length
+      ? diff.changes.map(function (c){
+          return '<div class="diff">' +
+                 '<div class="row"><span class="fk">' + esc(c.field) + '</span>' +
+                   '<span>' +
+                     (c.added ? '<span class="plus">+ ' + esc(c.added) + '</span>' : "") +
+                     (c.added && c.removed ? "　" : "") +
+                     (c.removed ? '<span class="minus">− ' + esc(c.removed) + '</span>' : "") +
+                   '</span></div></div>';
+        }).join("")
+      : '<div class="diff"><div class="row"><span class="fk">结果</span>' +
+        '<span class="none">两次标注一致</span></div></div>';
+
+    document.getElementById("aside").innerHTML =
+      '<h3>相似场景 · summary-dense 余弦</h3>' + near +
+      '<h3 class="gap">版本差异 · v1 → v2 重标注</h3>' +
+      '<div class="diff"><div class="dh"><b>场景 ' + diff.index + '</b>' +
+        '<span>' + esc(diff.chapter_start) + ' 章</span></div>' +
+        '<div class="row"><span class="fk">叙事功能</span><span>' +
+          esc(diff.before_narrative) + ' → ' + esc(diff.after_narrative) + '</span></div>' +
+        '<div class="row"><span class="fk">情绪序列</span><span>' +
+          esc(diff.before_emotions.join("、") || "—") + ' → ' +
+          esc(diff.after_emotions.join("、") || "—") + '</span></div>' +
+      '</div>' + changes;
+  }
+
+  /* ── 向量星图 ──────────────────────────────────────── */
+  var firstPaint = true;
+
+  function renderSky(){
+    var W = 1000, H = 400, PAD = 52;
+    var plotW = W - PAD * 2, plotH = H - PAD * 2;
+    var px = function (x){ return PAD + x * plotW; };
+    var py = function (y){ return H - PAD - y * plotH; };
+    var sel = BY_ID[current];
+    var parts = [];
+
+    for (var g = 1; g < 5; g++) {
+      parts.push('<line class="gridline" x1="' + px(g / 5) + '" y1="' + PAD +
+                 '" x2="' + px(g / 5) + '" y2="' + (H - PAD) + '"/>');
+    }
+    for (var h = 1; h < 3; h++) {
+      parts.push('<line class="gridline" x1="' + PAD + '" y1="' + py(h / 3) +
+                 '" x2="' + (W - PAD) + '" y2="' + py(h / 3) + '"/>');
+    }
+
+    sel.neighbors.forEach(function (n){
+      var t = BY_ID[n.index];
+      parts.push('<line class="link" x1="' + px(sel.x).toFixed(1) + '" y1="' +
+                 py(sel.y).toFixed(1) + '" x2="' + px(t.x).toFixed(1) +
+                 '" y2="' + py(t.y).toFixed(1) + '"/>');
+    });
+
+    SCENES.forEach(function (s, order){
+      var isSel = s.index === current;
+      var delay = firstPaint && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "transition:opacity .5s ease " + (order * 18) + "ms;opacity:0;"
+        : "";
+      parts.push(
+        '<circle class="pt" data-i="' + s.index + '" tabindex="0" role="button"' +
+        ' aria-label="场景 ' + s.index + '，' + esc(s.narrative_func_display) + '"' +
+        ' cx="' + px(s.x).toFixed(1) + '" cy="' + py(s.y).toFixed(1) + '"' +
+        ' r="' + (isSel ? 9 : 6) + '"' +
+        ' fill="' + colorOf(s.narrative_func_display) + '"' +
+        ' fill-opacity="' + (isSel ? 1 : .82) + '"' +
+        ' style="' + delay + '"/>'
+      );
+      if (isSel) {
+        parts.push('<circle class="ring" cx="' + px(s.x).toFixed(1) + '" cy="' +
+                   py(s.y).toFixed(1) + '" r="15"/>');
+      }
+      parts.push('<text class="lab" x="' + (px(s.x) + 11).toFixed(1) + '" y="' +
+                 (py(s.y) - 8).toFixed(1) + '"' + (isSel ? ' fill="#F7F6F2"' : "") +
+                 '>' + s.index + '</text>');
+    });
+
+    var svg = document.getElementById("skyplot");
+    svg.innerHTML = parts.join("");
+    if (firstPaint) {
+      requestAnimationFrame(function (){
+        var nodes = svg.querySelectorAll(".pt");
+        for (var i = 0; i < nodes.length; i++) nodes[i].style.opacity = "1";
+      });
+      firstPaint = false;
+    }
+
+    document.getElementById("legend").innerHTML = DATA.stats.narrative.map(function (n){
+      return '<span><i style="background:' + colorOf(n.name) + '"></i>' +
+             esc(n.name) + ' ' + n.count + '</span>';
+    }).join("");
+    document.getElementById("skyfoot").innerHTML =
+      '已选 <b>场景 ' + sel.index + '</b>（' + esc(sel.narrative_func_display) +
+      '），虚线连向其最相近的 ' + sel.neighbors.length + ' 个场景。' +
+      '坐标来自 27 × ' + DATA.dataset.vector_dimension + ' 维向量的 PCA 前两主成分，' +
+      '仅保留相对位置关系，不代表语义绝对距离。';
+  }
+
+  /* ── 管线运行 ──────────────────────────────────────── */
+  function renderPipeline(){
+    var run = DATA.runtime_sample;
+    var byStage = {};
+    run.jobs.forEach(function (j){ byStage[j.stage] = j; });
+    document.getElementById("pipeline").innerHTML = STAGE_ORDER.map(function (stage, i){
+      var job = byStage[stage] || { status: "pending", done_items: 0 };
+      var done = job.status === "completed";
+      var tail = done
+        ? (job.done_items ? job.done_items + " 项" : "完成")
+        : esc(job.status);
+      return '<div class="pstage"><span class="k">' + (i + 1) + '</span>' +
+             '<span class="nm">' + STAGE_CN[stage] + '</span>' +
+             '<span class="en">' + esc(stage) + '</span>' +
+             '<span class="st"' + (done ? "" : ' style="color:#B88A44"') + '>✓ ' +
+             tail + '</span></div>';
+    }).join("");
+
+    document.getElementById("runs").innerHTML =
+      '<div class="rh">最近一次完整运行</div>' +
+      '<div class="kv"><span>book_id</span><span>' + esc(run.book_id) + '</span></div>' +
+      '<div class="kv"><span>样本</span><span>' + esc(run.title) + '</span></div>' +
+      '<div class="kv"><span>状态</span><span>' + esc(run.status) + '</span></div>' +
+      '<div class="kv"><span>章节 / 场景</span><span>' + esc(run.chapters) + ' / ' +
+        esc(run.scenes) + '</span></div>' +
+      '<div class="kv"><span>已标注 / 已入库</span><span>' + esc(run.annotated) + ' / ' +
+        esc(run.indexed) + '</span></div>';
+  }
+
+  /* ── 标签分布 ──────────────────────────────────────── */
+  var TALLY_GROUPS = [
+    { key: "scene_type", name: "场景类型" },
+    { key: "technique", name: "写作技法" },
+    { key: "style", name: "风格标签" },
+    { key: "emotion", name: "情绪标签" },
+    { key: "image", name: "关键意象" },
+    { key: "narrative", name: "叙事功能", colored: true }
+  ];
+
+  function renderTally(){
+    document.getElementById("tally").innerHTML = TALLY_GROUPS.map(function (g){
+      var rows = DATA.stats[g.key];
+      var max = rows.length ? rows[0].count : 1;
+      return '<div class="tgroup"><h4>' + g.name + '</h4>' + rows.map(function (r){
+        var fill = g.colored ? colorOf(r.name) : "var(--ink)";
+        return '<div class="trow"><span class="tn">' + esc(r.name) + '</span>' +
+               '<span class="tb"><i style="width:' +
+                 Math.max(4, Math.round(r.count / max * 100)) + '%;background:' + fill +
+               '"></i></span><span class="tc">' + r.count + '</span></div>';
+      }).join("") + '</div>';
+    }).join("");
+  }
+
+  /* ── 数据出处 ──────────────────────────────────────── */
+  function renderProv(){
+    var d = DATA.dataset;
+    document.getElementById("prov").innerHTML =
+      '<div><b>样本</b> ' + esc(d.name) + ' · ' + esc(d.source_chars) + ' 字 · ' +
+        '切分为 ' + esc(d.chapters) + ' 章 / ' + esc(d.scenes) + ' 场景</div>' +
+      '<div><b>正文来源</b> <code>' + esc(d.source_path) + '</code></div>' +
+      '<div><b>向量集合</b> <code>' + esc(d.source_collection) + '</code>（对比 <code>' +
+        esc(d.compare_collection) + '</code>）</div>' +
+      '<div><b>向量通道</b> ' + esc(d.vectors.dense.join(" / ")) + ' + ' +
+        esc(d.vectors.sparse.join(" / ")) + '，稠密 ' + esc(d.vector_dimension) + ' 维</div>' +
+      '<div style="grid-column:1/-1"><b>口径说明</b> ' + esc(d.provenance) + '</div>' +
+      '<div style="grid-column:1/-1"><b>页面性质</b> ' +
+        '静态只读快照。页面不连接数据库，全部内容由 <code>demo/export_demo_data.py</code> ' +
+        '从 Qdrant 与 PostgreSQL 导出后固化在 <code>demo/data.js</code>。</div>';
+  }
+
+  /* ── 选中与事件 ────────────────────────────────────── */
+  function select(index, keepFocus){
+    if (!BY_ID[index]) return;
+    current = index;
+    markActiveScene();
+    renderReader();
+    renderAside();
+    renderSky();
+    var active = document.querySelector('#chlist .sc[data-i="' + index + '"]');
+    if (active) active.scrollIntoView({ block: "nearest" });
+    if (keepFocus) {
+      var point = document.querySelector('#skyplot .pt[data-i="' + index + '"]');
+      if (point) point.focus({ preventScroll: true });
+    }
+  }
+
+  document.getElementById("chlist").addEventListener("click", function (e){
+    var btn = e.target.closest(".sc");
+    if (btn) select(Number(btn.getAttribute("data-i")));
+  });
+
+  document.getElementById("aside").addEventListener("click", function (e){
+    var btn = e.target.closest(".nb");
+    if (btn) select(Number(btn.getAttribute("data-i")));
+  });
+
+  var skyplot = document.getElementById("skyplot");
+  skyplot.addEventListener("click", function (e){
+    var pt = e.target.closest(".pt");
+    if (pt) select(Number(pt.getAttribute("data-i")));
+  });
+  skyplot.addEventListener("keydown", function (e){
+    var pt = e.target.closest(".pt");
+    if (!pt) return;
+    var i = Number(pt.getAttribute("data-i"));
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(i); return; }
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault(); select(i === SCENES.length ? 1 : i + 1, true);
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault(); select(i === 1 ? SCENES.length : i - 1, true);
+    }
+  });
+
+  document.addEventListener("keydown", function (e){
+    if (e.target.closest("input, button, summary, .pt")) return;
+    if (e.key === "ArrowRight") select(current === SCENES.length ? 1 : current + 1);
+    else if (e.key === "ArrowLeft") select(current === 1 ? SCENES.length : current - 1);
+  });
+
+  renderStrip();
+  renderChapters();
+  renderAside();
+  renderReader();
+  renderSky();
+  renderPipeline();
+  renderTally();
+  renderProv();
+  markActiveScene();
+})();
+</script>
+</body>
+</html>
