@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.dependencies import close_app_resources
-from app.api.routes import books, direct_query, health, search
+from app.api.routes import books, direct_query, health, observe, search
 from app.config import get_settings
 from app.logging_config import configure_logging
 from app.utils.errors import NovelRagError
@@ -31,6 +32,12 @@ app.include_router(health.router)
 app.include_router(books.router, prefix=settings.api_prefix)
 app.include_router(direct_query.router, prefix=settings.api_prefix)
 app.include_router(search.router, prefix=settings.api_prefix)
+app.include_router(observe.router, prefix=settings.api_prefix)
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard() -> FileResponse:
+    return FileResponse(Path(__file__).resolve().parents[1] / "dashboard" / "index.html")
 
 
 @app.exception_handler(NovelRagError)

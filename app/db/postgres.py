@@ -128,6 +128,49 @@ class PostgresRepository:
             ).mappings().all()
         return list(rows)
 
+    def list_versions(self, book_id: int) -> list[dict[str, Any]]:
+        statement = (
+            select(
+                scenes.c.version,
+                func.count().label("total_scenes"),
+                func.count().filter(scenes.c.reference_status == "selected").label("selected"),
+                func.count().filter(scenes.c.reference_status == "archived").label("archived"),
+                func.count().filter(scenes.c.reference_status == "evaluation_failed").label("evaluation_failed"),
+            )
+            .where(scenes.c.book_id == book_id)
+            .group_by(scenes.c.version)
+            .order_by(scenes.c.version.desc())
+        )
+        with self.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(statement).mappings()]
+
+    def list_version_scenes_page(
+        self, book_id: int, version: int, *, limit: int, offset: int,
+        reference_status: str | None = None,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        predicate = [scenes.c.book_id == book_id, scenes.c.version == version]
+        if reference_status:
+            predicate.append(scenes.c.reference_status == reference_status)
+        with self.engine.connect() as connection:
+            total = int(connection.execute(
+                select(func.count()).select_from(scenes).where(*predicate)
+            ).scalar_one())
+            rows = connection.execute(
+                select(
+                    scenes.c.id, scenes.c.scene_index_in_book,
+                    scenes.c.chapter_start_index, scenes.c.chapter_end_index,
+                    scenes.c.reference_status, scenes.c.reference_score,
+                    scenes.c.reference_reason, scenes.c.summary,
+                    scenes.c.style_summary, scenes.c.usage_hint,
+                    scenes.c.scene_type, scenes.c.technique,
+                    scenes.c.style_tags, scenes.c.emotion_tags,
+                    scenes.c.key_images, scenes.c.char_count,
+                    scenes.c.annotate_status, scenes.c.index_status,
+                ).where(*predicate).order_by(scenes.c.scene_index_in_book)
+                .limit(limit).offset(offset)
+            ).mappings().all()
+        return total, [dict(row) for row in rows]
+
     def update_book(self, book_id: int, **values: Any) -> None:
         values["updated_at"] = _utc_now()
         with self.engine.begin() as connection:

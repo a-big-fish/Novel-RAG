@@ -21,8 +21,8 @@ router = APIRouter(prefix="/books", tags=["retrieval"])
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
     version: int | None = Field(default=None, ge=1)
-    route_top_n: int = Field(default=20, ge=1, le=100)
-    rrf_top_n: int = Field(default=20, ge=1, le=100)
+    route_top_n: int | None = Field(default=None, ge=1, le=100)
+    rrf_top_n: int | None = Field(default=None, ge=1, le=100)
 
 
 @router.post("/{book_id}/search")
@@ -40,6 +40,9 @@ def search_book(
     version = payload.version or int(book["current_version"] or 0)
     if version <= 0:
         raise HTTPException(409, "book has no ready index version")
+    if (version > int(book["current_version"] or 0)
+            or not any(int(row["version"]) == version for row in repository.list_versions(book_id))):
+        raise HTTPException(404, "ready index version not found")
     if not payload.query.strip() or len(payload.query.strip()) > settings.query_max_chars:
         raise HTTPException(422, "query length is outside configured bounds")
     parser = QueryParser(repository, llm, settings)
@@ -47,8 +50,8 @@ def search_book(
     try:
         return retriever.search(
             book_id=book_id, version=version, query=payload.query,
-            route_top_n=payload.route_top_n,
-            rrf_top_n=payload.rrf_top_n,
+            route_top_n=payload.route_top_n or settings.query_route_top_n,
+            rrf_top_n=payload.rrf_top_n or settings.query_rrf_top_n,
         )
     except RetrievalError as exc:
         raise HTTPException(503, str(exc)) from exc

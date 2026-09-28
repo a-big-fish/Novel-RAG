@@ -51,6 +51,8 @@ class QueryParser:
         )
 
     def parse(self, query: str) -> ParsedQuery:
+        if self.settings.query_prompt_version != "v1":
+            raise ValueError("unsupported query prompt version")
         from app.prompts.query_parsing.v1 import PROMPT_VERSION, SYSTEM_PROMPT
 
         raw_intent = query.strip()

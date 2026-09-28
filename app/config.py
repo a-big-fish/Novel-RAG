@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    app_version: str = "0.7.0"
+    app_version: str = "0.8.0"
     api_prefix: str = "/api/v1"
 
     book_source_dir: Path = Path("E:/novels/tool")

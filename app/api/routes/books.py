@@ -23,6 +23,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/books", tags=["books"])
 
 
+@router.get("")
+def list_books(
+    repository: PostgresRepository = Depends(get_repository),
+) -> list[dict[str, Any]]:
+    return [
+        {key: book[key] for key in (
+            "id", "title", "author", "status", "current_version"
+        )}
+        for book in repository.list_books()
+    ]
+
+
 class AddBookRequest(BaseModel):
     source_path: str
     title: str = Field(min_length=1, max_length=300)
