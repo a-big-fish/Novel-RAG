@@ -17,6 +17,7 @@ from app.db.models import (
     chapters,
     embedding_cache,
     index_jobs,
+    query_parsing_cache,
     reference_evaluation_cache,
     scenes,
     tag_vocab,
@@ -578,6 +579,38 @@ class PostgresRepository:
                 )
             ).all()
         return {token: int(freq) for token, freq in rows}
+
+    def get_token_map(self, book_id: int) -> dict[str, int]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(token_map.c.token, token_map.c.token_id).where(
+                    token_map.c.book_id == book_id
+                )
+            ).all()
+        return {str(token): int(token_id) for token, token_id in rows}
+
+    def get_query_cache(self, input_hash: str) -> dict[str, Any] | None:
+        with self.engine.connect() as connection:
+            row = connection.execute(
+                select(query_parsing_cache.c.output_json).where(
+                    query_parsing_cache.c.input_hash == input_hash
+                )
+            ).scalar_one_or_none()
+        return dict(row) if row is not None else None
+
+    def put_query_cache(
+        self, *, input_hash: str, model: str, prompt_version: str,
+        tag_vocab_version: str, query_text: str, output_json: dict[str, Any],
+    ) -> None:
+        with self.engine.begin() as connection:
+            connection.execute(
+                pg_insert(query_parsing_cache).values(
+                    input_hash=input_hash, model=model,
+                    prompt_version=prompt_version,
+                    tag_vocab_version=tag_vocab_version,
+                    query_text=query_text, output_json=output_json,
+                ).on_conflict_do_nothing(index_elements=[query_parsing_cache.c.input_hash])
+            )
 
     # ------------------------------------------------------------------
     # Index jobs

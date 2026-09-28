@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     tag_vocab_version: str = "v1"
     reference_rule_version: str = "v1"
     prompt_version: str = "v1.0"
+    query_prompt_version: str = "v1"
+    query_max_chars: int = 2000
+    query_route_top_n: int = 20
+    query_rrf_top_n: int = 20
+    rrf_k: int = 60
     log_level: str = "INFO"
 
     @field_validator(

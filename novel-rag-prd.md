@@ -877,6 +877,7 @@ qdrant.upsert(
 - 候选词表与标注共用一套 `tag_vocab`。
 - 本批解析结果不产生 hard/soft/negative 权重字段，也不驱动人工加权。
 - 解析失败或结构化字段为空时，meta-dense 与 summary-dense 的查询文本也回退为 `raw_intent`，保证四路仍可独立运行并展示。
+- 查询解析成功后写入 PostgreSQL `query_parsing_cache`，缓存键包含模型、Prompt 版本、词表版本和规范化后的原始查询；缓存命中时不调用 LLM。解析失败不缓存。
 
 ### 6.2 查询向量构造
 
@@ -906,6 +907,7 @@ qdrant.upsert(
 
 - 每一路返回自己的 rank、Qdrant 原始 score 和 Scene 标识，不把不同向量空间的 score 直接相加或比较。
 - 四路即使没有命中也必须出现在响应中，结果数组为空并携带耗时与错误状态。
+- 稀疏查询全部词项都不在目标书的 `token_map` 时，不向 Qdrant 发送空向量；该路返回 `status=skipped`、`reason=no_known_tokens` 和空结果。有效稀疏向量检索后零命中为 `status=ok`，服务异常为 `status=failed`。
 - 只召回 `reference_status = selected` 且属于请求 version 的 Point。
 - 单路失败时保留其他路结果，并使用成功路由继续产生 RRF；失败路由必须进入 `degraded_routes`。四路全部失败时整个请求失败，不返回伪造的空成功结果。
 
@@ -926,7 +928,7 @@ rrf_score(scene) = Σ 1 / (RRF_K + rank_route(scene))
 
 ### 6.5 PostgreSQL 回表与响应
 
-RRF 只处理 Qdrant 中的候选标识。展示前按 `scene_id + book_id + version` 回 PostgreSQL 获取权威原文和元数据；Qdrant payload 不作为完整原文的唯一事实来源。
+RRF 只处理 Qdrant 中的候选标识。融合结果返回 `scene_id + book_id + version`、有界预览及必要元数据，不返回完整原文。需要阅读全文时按这三个键单独查询 PostgreSQL；Qdrant payload 不作为完整原文的唯一事实来源。本批不引入更小粒度的片段 ID。
 
 响应必须包含：
 
@@ -953,7 +955,7 @@ RRF 只处理 Qdrant 中的候选标识。展示前按 `scene_id + book_id + ver
           "text_dense": 0.01639,
           "summary_dense": 0.01613
         },
-        "text_full": "……",
+        "text_preview": "……",
         "summary": "……",
         "style_summary": "……",
         "usage_hint": "……"
@@ -965,7 +967,7 @@ RRF 只处理 Qdrant 中的候选标识。展示前按 `scene_id + book_id + ver
 }
 ```
 
-本批不做自动上下文拼接，也不依据 token 预算裁切最终结果。调用方获得 Scene 原文、摘要和元数据后自行决定用途。
+本批不做自动上下文拼接。列表预览仅为界面展示限长；调用方可按 `scene_id` 从 Scene 详情接口获取完整原文。
 
 ### 6.6 实时索引观察台
 
@@ -1287,7 +1289,7 @@ Content-Type: application/json
 
 - `query` 去除首尾空白后不能为空，并设置明确长度上限。
 - `route_top_n`、`rrf_top_n` 必须受服务端上下限约束，不能由客户端请求无界结果。
-- 请求不写数据库、不写 Qdrant、不记录用户会话。
+- 请求可写独立的 `query_parsing_cache` 持久缓存；不得修改 books、chapters、scenes、token_map 或 Qdrant Point，不记录用户会话。
 - 不接受 `book_weight`、`route_weight`、`tag_weight` 等权重参数。
 - 本批不接受多个 `book_id`；未来多书端点由高层聚合器另行定义。
 
