@@ -4,6 +4,7 @@ from collections.abc import Callable
 from functools import lru_cache
 
 from app.clients.ollama_client import OllamaClient
+from app.clients.llm_client import JsonLLMClient, build_llm_client
 from app.config import Settings, get_settings
 from app.db.postgres import PostgresDatabase, PostgresRepository
 from app.db.qdrant import QdrantAdapter
@@ -32,6 +33,11 @@ def get_ollama_client() -> OllamaClient:
     return OllamaClient(settings=get_settings())
 
 
+@lru_cache(maxsize=1)
+def get_query_llm_client() -> JsonLLMClient:
+    return build_llm_client(get_settings())
+
+
 def get_app_settings() -> Settings:
     return get_settings()
 
@@ -49,6 +55,9 @@ def close_app_resources() -> None:
     if get_ollama_client.cache_info().currsize:
         get_ollama_client().close()
         get_ollama_client.cache_clear()
+    if get_query_llm_client.cache_info().currsize:
+        get_query_llm_client().close()
+        get_query_llm_client.cache_clear()
     if get_qdrant_adapter.cache_info().currsize:
         get_qdrant_adapter().close()
         get_qdrant_adapter.cache_clear()
