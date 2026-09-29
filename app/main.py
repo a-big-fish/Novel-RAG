@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.exc import ProgrammingError
 
 from app.api.dependencies import close_app_resources
 from app.api.routes import books, direct_query, health, observe, search
@@ -49,3 +50,16 @@ async def novel_rag_error_handler(
         status_code=422,
         content={"detail": str(exc), "error_type": exc.__class__.__name__},
     )
+
+
+@app.exception_handler(ProgrammingError)
+async def database_schema_error_handler(
+    _: Request,
+    exc: ProgrammingError,
+) -> JSONResponse:
+    if getattr(exc.orig, "sqlstate", None) == "42P01":
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "配置的 PostgreSQL 库缺少项目表。预览现有测试数据请运行 scripts/start_dashboard_preview.ps1；正式库需先完成迁移。"},
+        )
+    return JSONResponse(status_code=500, content={"detail": "PostgreSQL 查询失败"})

@@ -37,6 +37,16 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影，可在“检索实验”中并列查看四路结果与 RRF。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
 
+### 预览已有《马之途》数据
+
+《马之途》当前保存在隔离库 `novel-rag-test-2`。若 `.env` 的 `POSTGRES_DB=novel_rag` 尚未迁移，直接打开看板会提示缺少项目表。使用以下命令可仅在服务进程中切换到隔离库，不改写 `.env`：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start_dashboard_preview.ps1
+```
+
+然后打开 `http://127.0.0.1:8000/dashboard`。正式库迁移和正式数据索引是独立操作；预览脚本不会执行它们。
+
 ## API
 
 Base path 为 `/api/v1`，健康检查为 `/health`。
