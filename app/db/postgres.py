@@ -171,6 +171,29 @@ class PostgresRepository:
             ).mappings().all()
         return total, [dict(row) for row in rows]
 
+    def list_version_scene_metrics(
+        self, book_id: int, version: int,
+    ) -> list[dict[str, Any]]:
+        statement = select(
+            scenes.c.reference_status, scenes.c.annotate_status,
+            scenes.c.index_status, scenes.c.char_count,
+            scenes.c.scene_type, scenes.c.technique,
+            scenes.c.style_tags, scenes.c.emotion_tags,
+            scenes.c.key_images,
+        ).where(scenes.c.book_id == book_id, scenes.c.version == version)
+        with self.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(statement).mappings()]
+
+    def list_scene_fingerprints(
+        self, book_id: int, version: int,
+    ) -> list[dict[str, Any]]:
+        statement = select(
+            func.md5(scenes.c.text).label("text_hash"),
+            scenes.c.reference_status,
+        ).where(scenes.c.book_id == book_id, scenes.c.version == version)
+        with self.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(statement).mappings()]
+
     def update_book(self, book_id: int, **values: Any) -> None:
         values["updated_at"] = _utc_now()
         with self.engine.begin() as connection:

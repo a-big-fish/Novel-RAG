@@ -84,6 +84,8 @@ class QueryParser:
             }
             for field, namespace in _TAG_FIELDS.items():
                 values = output.get(field) or []
+                if isinstance(values, str):
+                    values = [values]
                 if not isinstance(values, list) or any(not isinstance(v, str) for v in values):
                     raise ValueError(f"invalid {field}")
                 normalized[field] = self.vocabulary.map_many(namespace, values)

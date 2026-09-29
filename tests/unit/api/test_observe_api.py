@@ -12,10 +12,14 @@ class FakeRepository:
         return {"id": 7, "title": "测试书", "author": "甲", "current_version": 2, "status": "ready"}
 
     def list_versions(self, _book_id):
-        return [{"version": 2, "total_scenes": 2, "selected": 1,
-                 "archived": 1, "evaluation_failed": 0}]
+        return [
+            {"version": 2, "total_scenes": 2, "selected": 1,
+             "archived": 1, "evaluation_failed": 0},
+            {"version": 1, "total_scenes": 2, "selected": 1,
+             "archived": 1, "evaluation_failed": 0},
+        ]
 
-    def list_scenes(self, _book_id, _version):
+    def list_version_scene_metrics(self, _book_id, _version):
         return [
             {"reference_status": "selected", "annotate_status": "annotated",
              "index_status": "indexed", "char_count": 200,
@@ -29,6 +33,16 @@ class FakeRepository:
 
     def list_jobs(self, _book_id):
         return []
+
+    def get_tag_vocab(self):
+        return [{"namespace": "scene_type", "canonical_key": "action", "display_name": "动作场景"}]
+
+    def list_scene_fingerprints(self, _book_id, version):
+        if version == 2:
+            return [{"text_hash": "a", "reference_status": "selected"},
+                    {"text_hash": "b", "reference_status": "archived"}]
+        return [{"text_hash": "a", "reference_status": "archived"},
+                {"text_hash": "c", "reference_status": "selected"}]
 
     def list_version_scenes_page(self, _, __, *, limit, offset, reference_status):
         assert limit == 1 and offset == 0 and reference_status == "selected"
@@ -49,8 +63,12 @@ def test_observation_uses_versioned_read_only_contract():
         overview = client.get(base + "/overview").json()
         assert overview["counts_match"] is True
         assert overview["counts"]["archived"] == 1
+        assert overview["tags"]["scene_type"][0]["label"] == "动作场景"
         page = client.get(base + "/scenes?limit=1&reference_status=selected").json()
         assert page["items"][0]["id"] == 10
+        comparison = client.get(base + "/compare?other_version=1").json()
+        assert comparison["new_text"] == 1
+        assert comparison["reference_status_changed"] == 1
         assert client.get("/api/v1/books/7/versions/3/overview").status_code == 404
     finally:
         app.dependency_overrides.clear()

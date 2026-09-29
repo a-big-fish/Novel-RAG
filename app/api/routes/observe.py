@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import UTC, datetime
-from hashlib import sha256
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -51,11 +50,20 @@ def overview(
 ) -> dict:
     book, versions = _version_or_404(repository, book_id, version)
     info = next(item for item in versions if int(item["version"]) == version)
-    scenes = repository.list_scenes(book_id, version)
+    scenes = repository.list_version_scene_metrics(book_id, version)
     tags = {
         name: Counter(tag for scene in scenes for tag in (scene[name] or []))
         for name in ("scene_type", "technique", "style_tags", "emotion_tags", "key_images")
     }
+    namespaces = {
+        "scene_type": "scene_type", "technique": "technique",
+        "style_tags": "style", "emotion_tags": "emotion", "key_images": "image",
+    }
+    display_names = {}
+    for row in repository.get_tag_vocab():
+        display_names.setdefault(
+            (row["namespace"], row["canonical_key"]), row["display_name"]
+        )
     collection = scenes_collection_name(book_id, version)
     try:
         qdrant_count = qdrant.count(collection)
@@ -76,7 +84,13 @@ def overview(
         "qdrant_count": qdrant_count,
         "counts_match": qdrant_count == indexed if qdrant_count is not None else None,
         "lengths": [int(scene["char_count"]) for scene in scenes],
-        "tags": {name: dict(counter.most_common(20)) for name, counter in tags.items()},
+        "tags": {
+            name: [
+                {"key": key, "label": display_names.get((namespaces[name], key), key),
+                 "count": count}
+                for key, count in counter.most_common(20)
+            ] for name, counter in tags.items()
+        },
         "recent_book_jobs": [
             {"stage": row["stage"], "status": row["status"],
              "done_items": row["done_items"], "total_items": row["total_items"]}
@@ -93,12 +107,10 @@ def compare_versions(
 ) -> dict:
     _version_or_404(repository, book_id, version)
     _version_or_404(repository, book_id, other_version)
-    current = repository.list_scenes(book_id, version)
-    other = repository.list_scenes(book_id, other_version)
-    def key(scene):
-        return sha256(str(scene["text"]).encode("utf-8")).hexdigest()
-    current_by_text = {key(scene): scene for scene in current}
-    other_by_text = {key(scene): scene for scene in other}
+    current = repository.list_scene_fingerprints(book_id, version)
+    other = repository.list_scene_fingerprints(book_id, other_version)
+    current_by_text = {scene["text_hash"]: scene for scene in current}
+    other_by_text = {scene["text_hash"]: scene for scene in other}
     shared = current_by_text.keys() & other_by_text.keys()
     return {
         "book_id": book_id, "version": version,
@@ -110,7 +122,7 @@ def compare_versions(
             current_by_text[item]["reference_status"] != other_by_text[item]["reference_status"]
             for item in shared
         ),
-        "matching_rule": "exact_scene_text_hash",
+        "matching_rule": "exact_scene_text_md5",
         "generated_at": _timestamp(),
     }
 

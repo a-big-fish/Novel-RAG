@@ -32,7 +32,7 @@ def test_query_parser_maps_known_tags_and_uses_persistent_cache():
     repository = FakeRepository()
     llm = FakeLLM({
         "summary_query": "雨夜追逐",
-        "scene_type": ["动作场景", "unknown"],
+        "scene_type": "动作场景",
         "style_tags": ["短句"],
     })
     parser = QueryParser(repository, llm, Settings())
@@ -47,7 +47,7 @@ def test_query_parser_maps_known_tags_and_uses_persistent_cache():
 
 def test_query_parser_falls_back_on_invalid_output_without_caching():
     repository = FakeRepository()
-    parser = QueryParser(repository, FakeLLM({"technique": "invalid"}), Settings())
+    parser = QueryParser(repository, FakeLLM({"technique": {"invalid": True}}), Settings())
     result = parser.parse("雨夜追逐")
     assert result.fallback is True
     assert result.summary_query == ""
