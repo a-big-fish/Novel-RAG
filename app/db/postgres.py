@@ -17,6 +17,7 @@ from app.db.models import (
     chapters,
     embedding_cache,
     index_jobs,
+    query_parsing_cache,
     reference_evaluation_cache,
     scenes,
     tag_vocab,
@@ -126,6 +127,72 @@ class PostgresRepository:
                 select(books).order_by(books.c.id.desc())
             ).mappings().all()
         return list(rows)
+
+    def list_versions(self, book_id: int) -> list[dict[str, Any]]:
+        statement = (
+            select(
+                scenes.c.version,
+                func.count().label("total_scenes"),
+                func.count().filter(scenes.c.reference_status == "selected").label("selected"),
+                func.count().filter(scenes.c.reference_status == "archived").label("archived"),
+                func.count().filter(scenes.c.reference_status == "evaluation_failed").label("evaluation_failed"),
+            )
+            .where(scenes.c.book_id == book_id)
+            .group_by(scenes.c.version)
+            .order_by(scenes.c.version.desc())
+        )
+        with self.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(statement).mappings()]
+
+    def list_version_scenes_page(
+        self, book_id: int, version: int, *, limit: int, offset: int,
+        reference_status: str | None = None,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        predicate = [scenes.c.book_id == book_id, scenes.c.version == version]
+        if reference_status:
+            predicate.append(scenes.c.reference_status == reference_status)
+        with self.engine.connect() as connection:
+            total = int(connection.execute(
+                select(func.count()).select_from(scenes).where(*predicate)
+            ).scalar_one())
+            rows = connection.execute(
+                select(
+                    scenes.c.id, scenes.c.scene_index_in_book,
+                    scenes.c.chapter_start_index, scenes.c.chapter_end_index,
+                    scenes.c.reference_status, scenes.c.reference_score,
+                    scenes.c.reference_reason, scenes.c.summary,
+                    scenes.c.style_summary, scenes.c.usage_hint,
+                    scenes.c.scene_type, scenes.c.technique,
+                    scenes.c.style_tags, scenes.c.emotion_tags,
+                    scenes.c.key_images, scenes.c.char_count,
+                    scenes.c.annotate_status, scenes.c.index_status,
+                ).where(*predicate).order_by(scenes.c.scene_index_in_book)
+                .limit(limit).offset(offset)
+            ).mappings().all()
+        return total, [dict(row) for row in rows]
+
+    def list_version_scene_metrics(
+        self, book_id: int, version: int,
+    ) -> list[dict[str, Any]]:
+        statement = select(
+            scenes.c.reference_status, scenes.c.annotate_status,
+            scenes.c.index_status, scenes.c.char_count,
+            scenes.c.scene_type, scenes.c.technique,
+            scenes.c.style_tags, scenes.c.emotion_tags,
+            scenes.c.key_images,
+        ).where(scenes.c.book_id == book_id, scenes.c.version == version)
+        with self.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(statement).mappings()]
+
+    def list_scene_fingerprints(
+        self, book_id: int, version: int,
+    ) -> list[dict[str, Any]]:
+        statement = select(
+            func.md5(scenes.c.text).label("text_hash"),
+            scenes.c.reference_status,
+        ).where(scenes.c.book_id == book_id, scenes.c.version == version)
+        with self.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(statement).mappings()]
 
     def update_book(self, book_id: int, **values: Any) -> None:
         values["updated_at"] = _utc_now()
@@ -578,6 +645,38 @@ class PostgresRepository:
                 )
             ).all()
         return {token: int(freq) for token, freq in rows}
+
+    def get_token_map(self, book_id: int) -> dict[str, int]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(token_map.c.token, token_map.c.token_id).where(
+                    token_map.c.book_id == book_id
+                )
+            ).all()
+        return {str(token): int(token_id) for token, token_id in rows}
+
+    def get_query_cache(self, input_hash: str) -> dict[str, Any] | None:
+        with self.engine.connect() as connection:
+            row = connection.execute(
+                select(query_parsing_cache.c.output_json).where(
+                    query_parsing_cache.c.input_hash == input_hash
+                )
+            ).scalar_one_or_none()
+        return dict(row) if row is not None else None
+
+    def put_query_cache(
+        self, *, input_hash: str, model: str, prompt_version: str,
+        tag_vocab_version: str, query_text: str, output_json: dict[str, Any],
+    ) -> None:
+        with self.engine.begin() as connection:
+            connection.execute(
+                pg_insert(query_parsing_cache).values(
+                    input_hash=input_hash, model=model,
+                    prompt_version=prompt_version,
+                    tag_vocab_version=tag_vocab_version,
+                    query_text=query_text, output_json=output_json,
+                ).on_conflict_do_nothing(index_elements=[query_parsing_cache.c.input_hash])
+            )
 
     # ------------------------------------------------------------------
     # Index jobs

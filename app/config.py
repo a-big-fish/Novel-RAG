@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    app_version: str = "0.7.0"
+    app_version: str = "0.8.0"
     api_prefix: str = "/api/v1"
 
     book_source_dir: Path = Path("E:/novels/tool")
@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     tag_vocab_version: str = "v1"
     reference_rule_version: str = "v1"
     prompt_version: str = "v1.0"
+    query_prompt_version: str = "v1"
+    query_max_chars: int = 2000
+    query_route_top_n: int = 20
+    query_rrf_top_n: int = 20
+    rrf_k: int = 60
     log_level: str = "INFO"
 
     @field_validator(

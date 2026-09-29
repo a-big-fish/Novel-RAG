@@ -2,7 +2,7 @@
 
 > 以完结小说为蓝本的写作范本检索系统
 > 独立服务，通过 HTTP API 提供小说知识库拆解、索引观察与自然语言范本检索
-> 当前阶段：上半链路已完成 Archive Layer + Reference Layer；本批先完善并随后实现实时索引观察台与单书检索 MVP
+> 当前阶段：上半链路已完成 Archive Layer + Reference Layer；实时索引观察台与单书检索 MVP 已实现并通过整体验证
 
 ------
 
@@ -200,7 +200,7 @@
 ⑦ 返回结构化查询、四路 Top-N、RRF Top-N 与检索轨迹
 ```
 
-**两条链路分开，上半链路是离线批处理，下半链路是在线只读请求。** 当前检索器只接收一个选定 `book_id`；未来多书聚合器并行调用同一单书契约，底层检索器不承担跨书权重或归一化。
+**两条链路分开，上半链路是离线批处理，下半链路在线读取索引与 Scene。** 查询解析成功结果可写独立缓存表，不改动书籍、场景或向量索引。当前检索器只接收一个选定 `book_id`；未来多书聚合器并行调用同一单书契约，底层检索器不承担跨书权重或归一化。
 ------
 
 ## 四、数据模型
@@ -216,6 +216,7 @@
 | `token_map`        | 稀疏向量 token 映射          | 必需 |
 | `reference_evaluation_cache` | Reference Evaluation 独立缓存 | 必需 |
 | `annotation_cache` | LLM 标注缓存                 | 必需 |
+| `query_parsing_cache` | 查询解析结果持久缓存       | 必需 |
 | `embedding_cache`  | Embedding 缓存               | 必需 |
 | `index_jobs`       | 索引进度追踪                 | 可选 |
 
@@ -877,6 +878,7 @@ qdrant.upsert(
 - 候选词表与标注共用一套 `tag_vocab`。
 - 本批解析结果不产生 hard/soft/negative 权重字段，也不驱动人工加权。
 - 解析失败或结构化字段为空时，meta-dense 与 summary-dense 的查询文本也回退为 `raw_intent`，保证四路仍可独立运行并展示。
+- 查询解析成功后写入 PostgreSQL `query_parsing_cache`，缓存键包含模型、Prompt 版本、词表版本和规范化后的原始查询；缓存命中时不调用 LLM。解析失败不缓存。
 
 ### 6.2 查询向量构造
 
@@ -906,6 +908,7 @@ qdrant.upsert(
 
 - 每一路返回自己的 rank、Qdrant 原始 score 和 Scene 标识，不把不同向量空间的 score 直接相加或比较。
 - 四路即使没有命中也必须出现在响应中，结果数组为空并携带耗时与错误状态。
+- 稀疏查询全部词项都不在目标书的 `token_map` 时，不向 Qdrant 发送空向量；该路返回 `status=skipped`、`reason=no_known_tokens` 和空结果。有效稀疏向量检索后零命中为 `status=ok`，服务异常为 `status=failed`。
 - 只召回 `reference_status = selected` 且属于请求 version 的 Point。
 - 单路失败时保留其他路结果，并使用成功路由继续产生 RRF；失败路由必须进入 `degraded_routes`。四路全部失败时整个请求失败，不返回伪造的空成功结果。
 
@@ -926,7 +929,7 @@ rrf_score(scene) = Σ 1 / (RRF_K + rank_route(scene))
 
 ### 6.5 PostgreSQL 回表与响应
 
-RRF 只处理 Qdrant 中的候选标识。展示前按 `scene_id + book_id + version` 回 PostgreSQL 获取权威原文和元数据；Qdrant payload 不作为完整原文的唯一事实来源。
+RRF 只处理 Qdrant 中的候选标识。融合结果返回 `scene_id + book_id + version`、有界预览及必要元数据，不返回完整原文。需要阅读全文时按这三个键单独查询 PostgreSQL；Qdrant payload 不作为完整原文的唯一事实来源。本批不引入更小粒度的片段 ID。
 
 响应必须包含：
 
@@ -953,7 +956,7 @@ RRF 只处理 Qdrant 中的候选标识。展示前按 `scene_id + book_id + ver
           "text_dense": 0.01639,
           "summary_dense": 0.01613
         },
-        "text_full": "……",
+        "text_preview": "……",
         "summary": "……",
         "style_summary": "……",
         "usage_hint": "……"
@@ -965,7 +968,7 @@ RRF 只处理 Qdrant 中的候选标识。展示前按 `scene_id + book_id + ver
 }
 ```
 
-本批不做自动上下文拼接，也不依据 token 预算裁切最终结果。调用方获得 Scene 原文、摘要和元数据后自行决定用途。
+本批不做自动上下文拼接。列表预览仅为界面展示限长；调用方可按 `scene_id` 从 Scene 详情接口获取完整原文。
 
 ### 6.6 实时索引观察台
 
@@ -1165,11 +1168,13 @@ API 分为现有上半链路、低层组件直查、本批实时观察和单书�
 | qdrant_direct_search  | `POST /api/v1/qdrant/collections/{collection_name}/points/search` | 实现   | 使用原始向量直查 Qdrant |
 | qdrant_get_point      | `GET /api/v1/qdrant/collections/{collection_name}/points/{point_id}` | 实现 | 按 point id 直查 Qdrant |
 | list_books            | `GET /api/v1/books`                                            | 本批新增 | 看板选择书籍，可按状态分页 |
-| list_book_versions    | `GET /api/v1/books/{book_id}/versions`                         | 本批新增 | 返回可观察版本及 current_version |
-| get_index_overview    | `GET /api/v1/books/{book_id}/versions/{version}/overview`      | 本批新增 | 漏斗、统计、一致性、管线状态 |
-| list_version_scenes   | `GET /api/v1/books/{book_id}/versions/{version}/scenes`        | 本批新增 | 分页、按章节和 reference_status 筛选 |
-| get_vector_projection | `GET /api/v1/books/{book_id}/versions/{version}/projection`    | 本批新增 | 指定向量的二维投影与近邻展示数据 |
-| search_book           | `POST /api/v1/books/{book_id}/search`                          | 本批新增 | 自然语言解析、四路 Top-N、无权重 RRF |
+| list_book_versions    | `GET /api/v1/books/{book_id}/versions`                         | 已实现 | 返回可观察版本及 current_version |
+| get_index_overview    | `GET /api/v1/books/{book_id}/versions/{version}/overview`      | 已实现 | 漏斗、统计、一致性、全书最近索引阶段 |
+| list_version_scenes   | `GET /api/v1/books/{book_id}/versions/{version}/scenes`        | 已实现 | 分页、按 reference_status 筛选 |
+| get_version_scene     | `GET /api/v1/books/{book_id}/versions/{version}/scenes/{scene_id}` | 已实现 | 按 Scene ID 回查完整原文 |
+| get_vector_projection | `GET /api/v1/books/{book_id}/versions/{version}/projection`    | 已实现 | 指定向量的二维投影，最多 500 个点 |
+| compare_versions      | `GET /api/v1/books/{book_id}/versions/{version}/compare`       | 已实现 | 按完整场景原文哈希对照版本 |
+| search_book           | `POST /api/v1/books/{book_id}/search`                          | 已实现 | 自然语言解析、四路 Top-N、无权重 RRF |
 
 ### 11.3 add_new_book
 
@@ -1280,14 +1285,14 @@ Content-Type: application/json
 3. 构造 text-dense、meta-dense、summary-dense、text-sparse 四类查询表示。
 4. 四路分别召回 Top-N，并保留原始 rank、score 和耗时。
 5. 使用同一 `RRF_K` 做无权重融合，按确定性规则处理同分。
-6. 对融合候选回 PostgreSQL 获取 Scene 原文和元数据。
+6. 对融合候选回 PostgreSQL 获取 Scene 限长预览和元数据；完整原文由版本化 Scene 详情接口按 `scene_id` 获取。
 7. 同时返回结构化查询、四路原始结果、RRF 结果及 degraded_routes。
 
 约束：
 
 - `query` 去除首尾空白后不能为空，并设置明确长度上限。
 - `route_top_n`、`rrf_top_n` 必须受服务端上下限约束，不能由客户端请求无界结果。
-- 请求不写数据库、不写 Qdrant、不记录用户会话。
+- 请求可写独立的 `query_parsing_cache` 持久缓存；不得修改 books、chapters、scenes、token_map 或 Qdrant Point，不记录用户会话。
 - 不接受 `book_weight`、`route_weight`、`tag_weight` 等权重参数。
 - 本批不接受多个 `book_id`；未来多书端点由高层聚合器另行定义。
 
@@ -1674,20 +1679,21 @@ bge-m3:latest                         1.2 GB
 | `prompts/reference_evaluation/` 提示词     | 已完成 v1        |
 | Reference Evaluation + archived/selected gate | 已完成 |
 | Qdrant 仅保留 selected Scene              | 已完成 |
-| `novel-rag-test-2` 迁移与集成测试       | 4 passed；原测试库未触碰 |
+| `novel-rag-test-2` 迁移与集成测试       | 5 passed；004 已在该库执行 |
+| 旧 `novel_rag_test`                         | 因本地 `.env` 覆盖测试库名，004 曾误建一个空查询缓存表；未删除或清空原有数据。迁移工具现固定 `--test` 指向 `novel-rag-test-2` |
 | `马之途.txt` 真实上半链路验收           | 10 章 / 10 Scene；selected 9、archived 1、indexed 9、failed 0 |
 | LLM 瞬时错误有限重试                    | 已完成；真实验收覆盖 502 恢复 |
 | 全量 EPUB → TXT 转换                       | 允许             |
 | 将全量文本直接交给模型                     | 禁止             |
-| 实时索引观察台 PRD                         | 已定稿；待开发   |
-| 查询解析 + 单书四路召回 PRD                | 已定稿；待开发   |
-| 无权重 RRF + 可解释贡献 PRD                | 已定稿；待开发   |
+| 实时索引观察台                             | 已实现；按 book_id + version 实时读取 |
+| 查询解析 + 单书四路召回                    | 已实现；成功解析写 PostgreSQL 持久缓存 |
+| 无权重 RRF + 可解释贡献                    | 已实现；RRF 列表只返回 scene_id 和限长预览 |
 | 多书高层聚合                               | 保留扩展位；本批不开发 |
 | Rerank                                     | 本批不开发       |
 | 上下文预算控制 / assembler                 | TBD；本批不开发  |
 | 自动上下文拼接、正文生成、写作             | 非本项目职责     |
 | 用户会话                                   | 后续拆书模块能力 |
-| 检索质量评估                               | 本批建立基线查询集，不调权 |
+| 检索质量评估                               | 《马之途》10 条查询 RRF Hit@5 为 10/10；单书人工目标基线，不能代表跨书效果，详见 `reports/retrieval-baseline-2026-09-29.md` |
 
 ------
 

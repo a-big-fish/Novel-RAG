@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from app.db.postgres import PostgresDatabase
+from app.config import get_settings
 
 
 def main() -> None:
@@ -21,7 +22,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    database = PostgresDatabase.from_settings(test=args.test)
+    settings = get_settings()
+    if args.test:
+        # Keep migrations away from older test databases even when .env
+        # overrides POSTGRES_TEST_DB.
+        settings = settings.model_copy(
+            update={"postgres_test_db": "novel-rag-test-2"}
+        )
+    database = PostgresDatabase.from_settings(settings, test=args.test)
     database.apply_migration(Path(args.migration))
     database.dispose()
     print(f"migration applied: {args.migration} (test={args.test})")
