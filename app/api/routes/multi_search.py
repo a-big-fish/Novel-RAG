@@ -59,11 +59,12 @@ def search_multiple_books(
     retriever = Retriever(repository, qdrant, ollama, parser, settings)
     reranker = (
         RerankClient(
-            url=settings.rerank_url,
-            model=settings.rerank_model,
+            base_url=settings.ollama_url,
+            model=settings.ollama_rerank_model,
             timeout_seconds=settings.rerank_timeout_seconds,
+            concurrency=settings.rerank_concurrency,
         )
-        if settings.rerank_enabled and settings.rerank_url else None
+        if settings.rerank_enabled else None
     )
     searcher = MultiBookSearcher(repository, retriever, settings, reranker)
     try:

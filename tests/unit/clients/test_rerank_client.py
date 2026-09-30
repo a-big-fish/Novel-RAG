@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -5,39 +7,73 @@ from app.clients.rerank_client import RerankClient
 from app.utils.errors import StorageError
 
 
-def test_rerank_client_sends_one_batch_and_validates_indexes():
+def response_with_logits(yes: float, no: float) -> httpx.Response:
+    return httpx.Response(200, json={"response": "yes" if yes > no else "no", "logprobs": [{
+        "top_logprobs": [
+            {"token": "yes", "logprob": yes},
+            {"token": "no", "logprob": no},
+        ],
+    }]})
+
+
+def test_rerank_client_uses_ollama_model_and_yes_no_probabilities():
     requests = []
 
     def handle(request):
-        requests.append(request)
-        return httpx.Response(200, json={"results": [
-            {"index": 1, "relevance_score": 0.9},
-            {"index": 0, "relevance_score": 0.2},
-        ]})
+        payload = json.loads(request.content)
+        requests.append((request, payload))
+        return response_with_logits(-0.1, -3.0) if "场景甲" in payload["prompt"] else response_with_logits(-3.0, -0.1)
 
-    client = httpx.Client(transport=httpx.MockTransport(handle))
+    client = httpx.Client(
+        base_url="http://ollama.test", transport=httpx.MockTransport(handle),
+    )
     reranker = RerankClient(
-        url="http://reranker.test/v1/rerank", model="fake",
+        base_url="http://ollama.test", model="my-ollama-reranker",
         timeout_seconds=3, client=client,
     )
     result = reranker.rerank("雨夜", ["场景甲", "场景乙"])
-    assert result == [{"index": 1, "score": 0.9}, {"index": 0, "score": 0.2}]
-    assert len(requests) == 1
-    assert requests[0].url.path == "/v1/rerank"
-    assert requests[0].read().decode("utf-8").count("场景") == 2
+    assert [item["index"] for item in result] == [0, 1]
+    assert result[0]["score"] > result[1]["score"]
+    assert len(requests) == 2
+    assert all(request.url.path == "/api/generate" for request, _ in requests)
+    assert all(payload["model"] == "my-ollama-reranker" for _, payload in requests)
+    assert all(payload["raw"] and payload["logprobs"] for _, payload in requests)
+    assert all("雨夜" in payload["prompt"] for _, payload in requests)
     client.close()
 
 
-def test_rerank_client_rejects_missing_candidate_score():
-    client = httpx.Client(transport=httpx.MockTransport(
-        lambda _request: httpx.Response(200, json={"results": [
-            {"index": 0, "relevance_score": 0.5},
-        ]}),
-    ))
+def test_rerank_client_censors_a_missing_no_probability():
+    client = httpx.Client(
+        base_url="http://ollama.test",
+        transport=httpx.MockTransport(lambda _request: httpx.Response(
+            200, json={"logprobs": [{"top_logprobs": [
+                {"token": "yes", "logprob": -0.1},
+            ]}]},
+        )),
+    )
     reranker = RerankClient(
-        url="http://reranker.test/v1/rerank", model="fake",
+        base_url="http://ollama.test", model="my-ollama-reranker",
         timeout_seconds=3, client=client,
     )
-    with pytest.raises(StorageError, match="result count"):
-        reranker.rerank("雨夜", ["场景甲", "场景乙"])
+    assert reranker.rerank("雨夜", ["场景甲"]) == [
+        {"index": 0, "score": 1.0, "score_exact": False},
+    ]
+    client.close()
+
+
+def test_rerank_client_rejects_response_without_yes_or_no():
+    client = httpx.Client(
+        base_url="http://ollama.test",
+        transport=httpx.MockTransport(lambda _request: httpx.Response(
+            200, json={"logprobs": [{"top_logprobs": [
+                {"token": "maybe", "logprob": -0.1},
+            ]}]},
+        )),
+    )
+    reranker = RerankClient(
+        base_url="http://ollama.test", model="my-ollama-reranker",
+        timeout_seconds=3, client=client,
+    )
+    with pytest.raises(StorageError, match="yes/no token probability"):
+        reranker.rerank("雨夜", ["场景甲"])
     client.close()

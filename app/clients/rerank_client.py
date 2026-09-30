@@ -1,53 +1,87 @@
 from __future__ import annotations
 
-from math import isfinite
+from concurrent.futures import ThreadPoolExecutor
+from math import exp, isfinite
 
 import httpx
 
 from app.utils.errors import StorageError
 
 
+_PREFIX = (
+    '<|im_start|>system\nJudge whether the Document meets the requirements '
+    'based on the Query and the Instruct provided. Note that the answer can '
+    'only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
+)
+_SUFFIX = '<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n'
+_INSTRUCTION = 'Given a writing request, retrieve novel scenes useful as writing references'
+
+
 class RerankClient:
-    """Client for a Jina/Cohere-compatible /v1/rerank scoring endpoint."""
+    """Score query/scene pairs with Qwen3-Reranker through Ollama logprobs."""
 
     def __init__(
-        self, *, url: str, model: str, timeout_seconds: float,
+        self, *, base_url: str, model: str, timeout_seconds: float,
+        concurrency: int = 2,
         client: httpx.Client | None = None,
     ) -> None:
-        self.url = url
         self.model = model
+        self.concurrency = concurrency
         self._owns_client = client is None
-        self.client = client or httpx.Client(timeout=timeout_seconds)
+        self.client = client or httpx.Client(
+            base_url=base_url.rstrip("/"), timeout=timeout_seconds,
+        )
 
     def close(self) -> None:
         if self._owns_client:
             self.client.close()
 
-    def rerank(self, query: str, documents: list[str]) -> list[dict[str, float | int]]:
-        if not documents:
-            return []
+    def _score(self, query: str, document: str) -> tuple[float, bool]:
+        prompt = (
+            f"{_PREFIX}<Instruct>: {_INSTRUCTION}\n"
+            f"<Query>: {query}\n<Document>: {document}{_SUFFIX}"
+        )
         try:
             response = self.client.post(
-                self.url,
+                "/api/generate",
                 json={
-                    "model": self.model, "query": query,
-                    "documents": documents, "top_n": len(documents),
+                    "model": self.model, "prompt": prompt, "raw": True,
+                    "stream": False, "logprobs": True, "top_logprobs": 20,
+                    "options": {"temperature": 0, "num_predict": 1},
                 },
             )
             response.raise_for_status()
-            results = response.json()["results"]
-            if not isinstance(results, list) or len(results) != len(documents):
-                raise ValueError("rerank result count does not match candidates")
-            normalized: list[dict[str, float | int]] = []
-            seen: set[int] = set()
-            for item in results:
-                index = int(item["index"])
-                score = float(item["relevance_score"])
-                if (index < 0 or index >= len(documents)
-                        or index in seen or not isfinite(score)):
-                    raise ValueError("rerank returned an invalid index or score")
-                seen.add(index)
-                normalized.append({"index": index, "score": score})
-            return normalized
-        except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
-            raise StorageError(f"rerank service failed: {exc}") from exc
+            alternatives = response.json()["logprobs"][0]["top_logprobs"]
+            logprobs = {
+                item["token"]: float(item["logprob"])
+                for item in alternatives if item["token"] in ("yes", "no")
+            }
+            if not logprobs or not all(
+                isfinite(value) for value in logprobs.values()
+            ):
+                raise ValueError("Ollama did not return a yes/no token probability")
+            # Ollama returns at most 20 alternatives. A missing answer is below
+            # that cutoff, so give it a conservative boundary score and retain
+            # the original candidate order when several scores are censored.
+            if "yes" not in logprobs:
+                return 0.0, False
+            if "no" not in logprobs:
+                return 1.0, False
+            if logprobs["yes"] >= logprobs["no"]:
+                return 1.0 / (1.0 + exp(logprobs["no"] - logprobs["yes"])), True
+            ratio = exp(logprobs["yes"] - logprobs["no"])
+            return ratio / (1.0 + ratio), True
+        except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
+            raise StorageError(f"Ollama rerank failed: {exc}") from exc
+
+    def rerank(self, query: str, documents: list[str]) -> list[dict[str, float | int | bool]]:
+        if not documents:
+            return []
+        with ThreadPoolExecutor(max_workers=min(self.concurrency, len(documents))) as pool:
+            scores = list(pool.map(
+                lambda document: self._score(query, document), documents,
+            ))
+        return [
+            {"index": index, "score": score, "score_exact": exact}
+            for index, (score, exact) in enumerate(scores)
+        ]

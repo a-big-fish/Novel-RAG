@@ -85,11 +85,12 @@ class MultiBookSearcher:
         if not candidates:
             return {"status": "skipped", "reason": "no_candidates"}, candidates
         if self.reranker is None:
-            return {"status": "failed", "reason": "rerank endpoint is not configured"}, candidates
+            return {"status": "failed", "reason": "Ollama reranker is not configured"}, candidates
 
         started = perf_counter()
+        evaluated = candidates[:self.settings.rerank_top_n]
         documents: list[str] = []
-        for item in candidates:
+        for item in evaluated:
             scene = self.repository.get_scene(item["scene_id"])
             if (scene is None or int(scene["book_id"]) != item["book_id"]
                     or int(scene["version"]) != item["version"]
@@ -113,17 +114,27 @@ class MultiBookSearcher:
         try:
             scores = self.reranker.rerank(query, documents)
             by_index = {int(item["index"]): float(item["score"]) for item in scores}
-            if len(by_index) != len(candidates) or set(by_index) != set(range(len(candidates))):
+            exact_by_index = {
+                int(item["index"]): bool(item.get("score_exact", True))
+                for item in scores
+            }
+            if len(by_index) != len(evaluated) or set(by_index) != set(range(len(evaluated))):
                 raise StorageError("rerank scores do not cover all candidates")
             ordered = sorted(
-                (dict(item, rerank_score=by_index[index])
-                 for index, item in enumerate(candidates)),
+                (dict(
+                    item, rerank_score=by_index[index],
+                    rerank_score_exact=exact_by_index[index],
+                )
+                 for index, item in enumerate(evaluated)),
                 key=lambda item: (-item["rerank_score"], item["candidate_rank"]),
             )
+            ordered.extend(candidates[len(evaluated):])
             for rank, item in enumerate(ordered, start=1):
                 item["rerank_rank"] = rank
             return {
-                "status": "ok", "model": self.settings.rerank_model,
+                "status": "ok", "model": self.settings.ollama_rerank_model,
+                "evaluated_count": len(evaluated),
+                "censored_count": sum(not exact for exact in exact_by_index.values()),
                 "latency_ms": round((perf_counter() - started) * 1000, 2),
             }, ordered
         except StorageError as exc:
