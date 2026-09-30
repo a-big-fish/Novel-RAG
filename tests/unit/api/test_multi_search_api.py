@@ -60,8 +60,9 @@ def test_multi_search_api_returns_book_scoped_candidates():
 
 def test_multi_search_api_uses_configured_reranker(monkeypatch):
     class FakeRerankClient:
-        def __init__(self, **_kwargs):
-            pass
+        def __init__(self, **kwargs):
+            assert kwargs["base_url"] == "http://ollama.test:11434"
+            assert kwargs["model"] == "my-ollama-reranker"
 
         def rerank(self, _query, documents):
             return [
@@ -78,7 +79,8 @@ def test_multi_search_api_uses_configured_reranker(monkeypatch):
     app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
     app.dependency_overrides[get_query_llm_client] = FakeLLM
     app.dependency_overrides[get_app_settings] = lambda: Settings(
-        rerank_enabled=True, rerank_url="http://reranker.test/v1/rerank",
+        rerank_enabled=True, ollama_url="http://ollama.test:11434",
+        ollama_rerank_model="my-ollama-reranker",
     )
     try:
         response = TestClient(app).post(

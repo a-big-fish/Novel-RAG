@@ -66,10 +66,11 @@ class FakeQdrant:
         })]
 
 
-def make_searcher(*, fail_book=None, rerank_enabled=False, reranker=None):
+def make_searcher(*, fail_book=None, rerank_enabled=False, reranker=None,
+                  rerank_top_n=10):
     settings = Settings(
         multi_search_concurrency=2, rerank_enabled=rerank_enabled,
-        rerank_max_document_chars=500,
+        rerank_max_document_chars=500, rerank_top_n=rerank_top_n,
     )
     repository = FakeRepository()
     parser = FakeParser()
@@ -167,4 +168,27 @@ def test_rerank_failure_falls_back_to_aggregation():
     )
     assert result["rerank"]["status"] == "failed"
     assert result["final"]["source"] == "aggregation"
+    assert [item["scene_id"] for item in result["final"]["items"]] == [101, 201]
+
+
+def test_rerank_only_scores_configured_candidate_count():
+    class FakeReranker:
+        def __init__(self):
+            self.document_count = 0
+
+        def rerank(self, _query, documents):
+            self.document_count = len(documents)
+            return [{"index": 0, "score": 0.8, "score_exact": False}]
+
+    reranker = FakeReranker()
+    searcher, _parser, _ollama, _qdrant = make_searcher(
+        rerank_enabled=True, reranker=reranker, rerank_top_n=1,
+    )
+    result = searcher.search(
+        query="雨夜", book_ids=[1, 2], route_top_n=5,
+        per_book_limit=5, global_limit=5,
+    )
+    assert reranker.document_count == 1
+    assert result["rerank"]["evaluated_count"] == 1
+    assert result["rerank"]["censored_count"] == 1
     assert [item["scene_id"] for item in result["final"]["items"]] == [101, 201]

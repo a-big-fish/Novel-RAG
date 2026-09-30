@@ -79,7 +79,7 @@ Qdrant 直查只接收调用方提供的原始向量；自然语言查询请使�
 
 `versions` 可省略；服务端在请求开始时固定各书当前版本。响应保留 `books` 内各书四路及 RRF 结果、逐书失败信息、`aggregation.items` 和 `final.items`。各书结果写结构化日志，不记录原文。某书失败不会抹去其他书结果；全部失败返回 503。跨书候选池使用轮流取候选，不直接比较不同书的 RRF 分数。
 
-默认 `RERANK_ENABLED=false`。启用时须设置 `RERANK_URL` 为返回逐候选 `index` 和 `relevance_score` 的 `/v1/rerank` 兼容服务，并设置该服务实际加载的 `RERANK_MODEL`。重排对聚合后的候选执行一次；服务失败会在 `rerank.status` 标明，并让 `final.items` 使用聚合顺序。旧 `OLLAMA_RERANK_MODEL` 只是预留配置，不作为在线重排评分接口。
+默认 `RERANK_ENABLED=false`。启用后直接使用 `OLLAMA_URL` 上的 `OLLAMA_RERANK_MODEL`，对聚合后的前 `RERANK_TOP_N` 条候选逐条计算 Qwen3-Reranker 的 yes/no token 概率；其余候选保持原顺序接在后面。`RERANK_CONCURRENCY` 控制同时提交给 Ollama 的评分请求。Ollama 最多返回前 20 个候选 token 的概率；若 yes 或 no 超出范围，候选会得到保守边界分数并标记 `rerank_score_exact=false`，响应同时给出 `censored_count`。模型或服务失败会在 `rerank.status` 标明，并让 `final.items` 使用完整聚合顺序。该模型调用需要 Ollama `/api/generate` 支持 `logprobs` 和 `top_logprobs`，开启后会增加推理延迟。
 
 对 `ready` 书籍再次调用索引接口会构建新 version；旧 version 在新 version 通过 selected-point 一致性校验并激活前保持可用。
 
