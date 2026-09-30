@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import ProgrammingError
 
 from app.api.dependencies import close_app_resources
-from app.api.routes import books, direct_query, health, observe, search
+from app.api.routes import books, direct_query, health, multi_search, observe, search
 from app.config import get_settings
 from app.logging_config import configure_logging
 from app.utils.errors import NovelRagError
@@ -33,6 +33,7 @@ app.include_router(health.router)
 app.include_router(books.router, prefix=settings.api_prefix)
 app.include_router(direct_query.router, prefix=settings.api_prefix)
 app.include_router(search.router, prefix=settings.api_prefix)
+app.include_router(multi_search.router, prefix=settings.api_prefix)
 app.include_router(observe.router, prefix=settings.api_prefix)
 
 

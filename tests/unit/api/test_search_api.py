@@ -31,8 +31,8 @@ class FakeRepository:
 
 
 class FakeOllama:
-    def embed(self, _):
-        return [[0.1, 0.2]]
+    def embed(self, texts):
+        return [[0.1, 0.2] for _ in texts]
 
 
 class FakeQdrant:
