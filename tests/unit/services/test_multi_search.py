@@ -66,14 +66,17 @@ class FakeQdrant:
         })]
 
 
-def make_searcher(*, fail_book=None):
-    settings = Settings(multi_search_concurrency=2)
+def make_searcher(*, fail_book=None, rerank_enabled=False, reranker=None):
+    settings = Settings(
+        multi_search_concurrency=2, rerank_enabled=rerank_enabled,
+        rerank_max_document_chars=500,
+    )
     repository = FakeRepository()
     parser = FakeParser()
     ollama = FakeOllama()
     qdrant = FakeQdrant(fail_book=fail_book)
     retriever = Retriever(repository, qdrant, ollama, parser, settings)
-    return MultiBookSearcher(repository, retriever, settings), parser, ollama, qdrant
+    return MultiBookSearcher(repository, retriever, settings, reranker), parser, ollama, qdrant
 
 
 def test_multi_book_search_prepares_once_and_keeps_book_provenance(caplog):
@@ -92,8 +95,8 @@ def test_multi_book_search_prepares_once_and_keeps_book_provenance(caplog):
                 (2, 2, 201), (1, 2, 101),
             ]
     assert result["degraded_books"] == []
-    assert "book_id=1" in caplog.text
-    assert "book_id=2" in caplog.text
+    assert {record.book_id for record in caplog.records
+            if record.msg == "multi_book_result"} == {1, 2}
 
 
 def test_multi_book_search_keeps_success_when_other_book_fails():
@@ -119,3 +122,46 @@ def test_multi_book_search_rejects_all_unready_books_before_model_calls():
         )
     assert not parser.calls
     assert not ollama.calls
+
+
+def test_enabled_rerank_reorders_global_candidates_only_after_aggregation():
+    class FakeReranker:
+        def __init__(self):
+            self.calls = []
+
+        def rerank(self, query, documents):
+            self.calls.append((query, documents))
+            return [{"index": 0, "score": 0.2}, {"index": 1, "score": 0.9}]
+
+    reranker = FakeReranker()
+    searcher, _parser, _ollama, _qdrant = make_searcher(
+        rerank_enabled=True, reranker=reranker,
+    )
+    result = searcher.search(
+        query="雨夜", book_ids=[1, 2], route_top_n=5,
+        per_book_limit=5, global_limit=5,
+    )
+    assert [item["scene_id"] for item in result["aggregation"]["items"]] == [101, 201]
+    assert [item["scene_id"] for item in result["final"]["items"]] == [201, 101]
+    assert result["final"]["source"] == "rerank"
+    assert result["rerank"]["status"] == "ok"
+    assert len(reranker.calls) == 1
+    assert reranker.calls[0][0] == "雨夜"
+    assert all(len(document) <= 500 for document in reranker.calls[0][1])
+
+
+def test_rerank_failure_falls_back_to_aggregation():
+    class FailingReranker:
+        def rerank(self, _query, _documents):
+            raise StorageError("unavailable")
+
+    searcher, _parser, _ollama, _qdrant = make_searcher(
+        rerank_enabled=True, reranker=FailingReranker(),
+    )
+    result = searcher.search(
+        query="雨夜", book_ids=[1, 2], route_top_n=5,
+        per_book_limit=5, global_limit=5,
+    )
+    assert result["rerank"]["status"] == "failed"
+    assert result["final"]["source"] == "aggregation"
+    assert [item["scene_id"] for item in result["final"]["items"]] == [101, 201]

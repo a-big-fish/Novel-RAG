@@ -6,7 +6,7 @@
 
 PostgreSQL 保留全部 Final Scene；Qdrant 只保留具有写作参考价值的 `selected` Scene。`archived` Scene 是正常小说结构资产，不是失败或废弃数据。
 
-单书检索包含自然语言解析、四路 Top-N、无权重 RRF 与 Scene 详情回查。Rerank、多书聚合、上下文组装仍属后续范围。
+单书检索包含自然语言解析、四路 Top-N、无权重 RRF 与 Scene 详情回查。多书检索共用一次查询解析和批量 Embedding，并发执行各书召回与书内 RRF，再按书内名次轮流汇集候选。全局 Rerank 为可选步骤；上下文组装仍属后续范围。
 
 ## 当前状态
 
@@ -64,11 +64,22 @@ Base path 为 `/api/v1`，健康检查为 `/health`。
 - `GET /api/v1/books/{book_id}/versions/{version}/projection`
 - `GET /api/v1/books/{book_id}/versions/{version}/compare?other_version=1`
 - `POST /api/v1/books/{book_id}/search`
+- `POST /api/v1/search/multi`
 - `GET /api/v1/scenes/{scene_id}`
 - `POST /api/v1/qdrant/collections/{collection}/points/search`
 - `GET /api/v1/qdrant/collections/{collection}/points/{point_id}`
 
-Qdrant 直查只接收调用方提供的原始向量；自然语言查询请使用单书 search 接口。RRF 列表返回 `scene_id` 与限长预览，完整原文通过版本化 Scene 详情接口获取。
+Qdrant 直查只接收调用方提供的原始向量；自然语言查询请使用单书或多书 search 接口。RRF 列表返回 `scene_id` 与限长预览，完整原文通过版本化 Scene 详情接口获取。
+
+多书请求示例：
+
+```json
+{"query":"寻找雨夜追逐与冷峻短句的场景","book_ids":[10,11],"versions":{"10":1},"per_book_limit":20,"global_limit":50}
+```
+
+`versions` 可省略；服务端在请求开始时固定各书当前版本。响应保留 `books` 内各书四路及 RRF 结果、逐书失败信息、`aggregation.items` 和 `final.items`。各书结果写结构化日志，不记录原文。某书失败不会抹去其他书结果；全部失败返回 503。跨书候选池使用轮流取候选，不直接比较不同书的 RRF 分数。
+
+默认 `RERANK_ENABLED=false`。启用时须设置 `RERANK_URL` 为返回逐候选 `index` 和 `relevance_score` 的 `/v1/rerank` 兼容服务，并设置该服务实际加载的 `RERANK_MODEL`。重排对聚合后的候选执行一次；服务失败会在 `rerank.status` 标明，并让 `final.items` 使用聚合顺序。旧 `OLLAMA_RERANK_MODEL` 只是预留配置，不作为在线重排评分接口。
 
 对 `ready` 书籍再次调用索引接口会构建新 version；旧 version 在新 version 通过 selected-point 一致性校验并激活前保持可用。
 
@@ -101,6 +112,7 @@ app/
   db/                 PostgreSQL Core 仓储、Qdrant 适配器、迁移入口
   prompts/            Reference Evaluation / Deep Annotation / 查询解析提示词
   services/           索引编排、查询解析、四路召回和 RRF
+                      多书并发聚合与可选全局 Rerank
   utils/              EPUB 转换、文本处理、异常
 data/
   books/

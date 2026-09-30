@@ -5,9 +5,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import perf_counter
 from typing import Any
 
+from app.clients.rerank_client import RerankClient
 from app.config import Settings
 from app.db.postgres import PostgresRepository
 from app.services.retriever import PreparedQuery, Retriever, RetrievalError
+from app.utils.errors import StorageError
+from app.utils.text import bounded_sample
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +51,68 @@ def interleave_candidates(
 class MultiBookSearcher:
     def __init__(
         self, repository: PostgresRepository, retriever: Retriever,
-        settings: Settings,
+        settings: Settings, reranker: RerankClient | None = None,
     ) -> None:
         self.repository = repository
         self.retriever = retriever
         self.settings = settings
+        self.reranker = reranker
+
+    def _rerank(
+        self, query: str, candidates: list[dict[str, Any]],
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        if not self.settings.rerank_enabled:
+            return {"status": "disabled"}, candidates
+        if not candidates:
+            return {"status": "skipped", "reason": "no_candidates"}, candidates
+        if self.reranker is None:
+            return {"status": "failed", "reason": "rerank endpoint is not configured"}, candidates
+
+        started = perf_counter()
+        documents: list[str] = []
+        for item in candidates:
+            scene = self.repository.get_scene(item["scene_id"])
+            if (scene is None or int(scene["book_id"]) != item["book_id"]
+                    or int(scene["version"]) != item["version"]
+                    or scene["reference_status"] != "selected"):
+                raise MultiBookSearchError("rerank scene lookup does not match candidate")
+            header = (
+                f"剧情摘要：{str(scene['summary'])[:300]}\n"
+                f"文风：{str(scene['style_summary'])[:200]}\n"
+                f"使用提示：{str(scene['usage_hint'])[:200]}\n原文：\n"
+            )
+            budget = self.settings.rerank_max_document_chars
+            excerpt = bounded_sample(
+                str(scene["text"]),
+                head_chars=self.settings.long_text_head_chars,
+                middle_chars=self.settings.long_text_middle_chars,
+                tail_chars=self.settings.long_text_tail_chars,
+                max_chars=max(1, budget - len(header)),
+            )
+            documents.append((header + excerpt)[:budget])
+
+        try:
+            scores = self.reranker.rerank(query, documents)
+            by_index = {int(item["index"]): float(item["score"]) for item in scores}
+            if len(by_index) != len(candidates) or set(by_index) != set(range(len(candidates))):
+                raise StorageError("rerank scores do not cover all candidates")
+            ordered = sorted(
+                (dict(item, rerank_score=by_index[index])
+                 for index, item in enumerate(candidates)),
+                key=lambda item: (-item["rerank_score"], item["candidate_rank"]),
+            )
+            for rank, item in enumerate(ordered, start=1):
+                item["rerank_rank"] = rank
+            return {
+                "status": "ok", "model": self.settings.rerank_model,
+                "latency_ms": round((perf_counter() - started) * 1000, 2),
+            }, ordered
+        except StorageError as exc:
+            logger.warning("multi-book rerank failed: %s", exc)
+            return {
+                "status": "failed", "reason": str(exc),
+                "latency_ms": round((perf_counter() - started) * 1000, 2),
+            }, candidates
 
     def _search_book(
         self, book_id: int, version: int, prepared: PreparedQuery,
@@ -139,12 +199,16 @@ class MultiBookSearcher:
         for book_id in book_ids:
             result = book_results[book_id]
             logger.info(
-                "multi-book search result: book_id=%s version=%s status=%s "
-                "attempts=%s candidates=%s latency_ms=%s degraded_routes=%s",
-                book_id, result.get("version"), result["status"],
-                result.get("attempts", 0),
-                len(result.get("rrf", {}).get("items", [])),
-                result.get("latency_ms"), result.get("degraded_routes", []),
+                "multi_book_result",
+                extra={
+                    "book_id": book_id,
+                    "version": result.get("version"),
+                    "status": result["status"],
+                    "attempts": result.get("attempts", 0),
+                    "candidate_count": len(result.get("rrf", {}).get("items", [])),
+                    "latency_ms": result.get("latency_ms"),
+                    "degraded_routes": result.get("degraded_routes", []),
+                },
             )
 
         if all(result["status"] != "ok" for result in book_results.values()):
@@ -153,6 +217,18 @@ class MultiBookSearcher:
         candidates = interleave_candidates(
             book_results, book_ids,
             per_book_limit=per_book_limit, global_limit=global_limit,
+        )
+        rerank, final_items = self._rerank(prepared.parsed.raw_intent, candidates)
+        logger.info(
+            "multi_book_aggregation",
+            extra={
+                "book_count": len(book_ids), "candidate_count": len(candidates),
+                "degraded_book_count": sum(
+                    result["status"] != "ok" for result in book_results.values()
+                ),
+                "rerank_status": rerank["status"],
+                "rerank_latency_ms": rerank.get("latency_ms"),
+            },
         )
         return {
             "raw_intent": prepared.parsed.raw_intent,
@@ -166,6 +242,11 @@ class MultiBookSearcher:
             "aggregation": {
                 "strategy": "round_robin_book_rrf",
                 "items": candidates,
+            },
+            "rerank": rerank,
+            "final": {
+                "source": "rerank" if rerank["status"] == "ok" else "aggregation",
+                "items": final_items,
             },
             "latency_ms": round((perf_counter() - started) * 1000, 2),
         }

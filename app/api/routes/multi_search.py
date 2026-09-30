@@ -9,6 +9,7 @@ from app.api.dependencies import (
 )
 from app.clients.llm_client import JsonLLMClient
 from app.clients.ollama_client import OllamaClient
+from app.clients.rerank_client import RerankClient
 from app.config import Settings
 from app.db.postgres import PostgresRepository
 from app.db.qdrant import QdrantAdapter
@@ -56,7 +57,15 @@ def search_multiple_books(
 
     parser = QueryParser(repository, llm, settings)
     retriever = Retriever(repository, qdrant, ollama, parser, settings)
-    searcher = MultiBookSearcher(repository, retriever, settings)
+    reranker = (
+        RerankClient(
+            url=settings.rerank_url,
+            model=settings.rerank_model,
+            timeout_seconds=settings.rerank_timeout_seconds,
+        )
+        if settings.rerank_enabled and settings.rerank_url else None
+    )
+    searcher = MultiBookSearcher(repository, retriever, settings, reranker)
     try:
         return searcher.search(
             query=payload.query, book_ids=payload.book_ids,
@@ -68,3 +77,6 @@ def search_multiple_books(
         )
     except MultiBookSearchError as exc:
         raise HTTPException(503, str(exc)) from exc
+    finally:
+        if reranker is not None:
+            reranker.close()
