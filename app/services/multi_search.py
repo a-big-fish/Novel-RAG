@@ -58,6 +58,25 @@ class MultiBookSearcher:
         self.settings = settings
         self.reranker = reranker
 
+    @staticmethod
+    def _log_book_results(
+        book_ids: list[int], book_results: dict[int, dict[str, Any]],
+    ) -> None:
+        for book_id in book_ids:
+            result = book_results[book_id]
+            logger.info(
+                "multi_book_result",
+                extra={
+                    "book_id": book_id,
+                    "version": result.get("version"),
+                    "status": result["status"],
+                    "attempts": result.get("attempts", 0),
+                    "candidate_count": len(result.get("rrf", {}).get("items", [])),
+                    "latency_ms": result.get("latency_ms"),
+                    "degraded_routes": result.get("degraded_routes", []),
+                },
+            )
+
     def _rerank(
         self, query: str, candidates: list[dict[str, Any]],
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -154,14 +173,19 @@ class MultiBookSearcher:
         book_results: dict[int, dict[str, Any]] = {}
         targets: list[tuple[int, int]] = []
         for book_id in book_ids:
-            book = self.repository.get_book(book_id)
+            try:
+                book = self.repository.get_book(book_id)
+                ready_versions = (
+                    {int(row["version"]) for row in self.repository.list_versions(book_id)}
+                    if book is not None else set()
+                )
+            except StorageError as exc:
+                book_results[book_id] = {"status": "failed", "error": str(exc)}
+                continue
             if book is None:
                 book_results[book_id] = {"status": "failed", "error": "book not found"}
                 continue
             version = versions.get(book_id) or int(book["current_version"] or 0)
-            ready_versions = {
-                int(row["version"]) for row in self.repository.list_versions(book_id)
-            }
             if (version <= 0 or version > int(book["current_version"] or 0)
                     or version not in ready_versions):
                 book_results[book_id] = {
@@ -172,6 +196,7 @@ class MultiBookSearcher:
             targets.append((book_id, version))
 
         if not targets:
+            self._log_book_results(book_ids, book_results)
             raise MultiBookSearchError("no requested book has a ready index version")
 
         prepared = self.retriever.prepare(query)
@@ -196,20 +221,7 @@ class MultiBookSearcher:
                         "status": "failed", "error": "book search worker failed",
                     }
 
-        for book_id in book_ids:
-            result = book_results[book_id]
-            logger.info(
-                "multi_book_result",
-                extra={
-                    "book_id": book_id,
-                    "version": result.get("version"),
-                    "status": result["status"],
-                    "attempts": result.get("attempts", 0),
-                    "candidate_count": len(result.get("rrf", {}).get("items", [])),
-                    "latency_ms": result.get("latency_ms"),
-                    "degraded_routes": result.get("degraded_routes", []),
-                },
-            )
+        self._log_book_results(book_ids, book_results)
 
         if all(result["status"] != "ok" for result in book_results.values()):
             raise MultiBookSearchError("all requested book searches failed")

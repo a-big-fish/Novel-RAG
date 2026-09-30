@@ -113,15 +113,18 @@ def test_multi_book_search_keeps_success_when_other_book_fails():
     assert len([call for call in qdrant.calls if call[0] == 2]) == 8
 
 
-def test_multi_book_search_rejects_all_unready_books_before_model_calls():
+def test_multi_book_search_rejects_all_unready_books_before_model_calls(caplog):
     searcher, parser, ollama, _qdrant = make_searcher()
-    with pytest.raises(MultiBookSearchError):
-        searcher.search(
-            query="雨夜", book_ids=[3], route_top_n=5,
-            per_book_limit=5, global_limit=5,
-        )
+    with caplog.at_level(logging.INFO, logger="app.services.multi_search"):
+        with pytest.raises(MultiBookSearchError):
+            searcher.search(
+                query="雨夜", book_ids=[3], route_top_n=5,
+                per_book_limit=5, global_limit=5,
+            )
     assert not parser.calls
     assert not ollama.calls
+    assert [(record.book_id, record.status) for record in caplog.records
+            if record.msg == "multi_book_result"] == [(3, "failed")]
 
 
 def test_enabled_rerank_reorders_global_candidates_only_after_aggregation():
