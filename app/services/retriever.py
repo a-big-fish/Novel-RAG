@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
 
@@ -8,13 +9,20 @@ from app.config import Settings
 from app.db.postgres import PostgresRepository
 from app.db.qdrant import QdrantAdapter, scenes_collection_name
 from app.services.fusion import reciprocal_rank_fusion
-from app.services.query_parser import QueryParser
+from app.services.query_parser import ParsedQuery, QueryParser
 from app.services.sparse import build_sparse_vector
 from app.utils.errors import StorageError
 
 
 class RetrievalError(StorageError):
     pass
+
+
+@dataclass(frozen=True)
+class PreparedQuery:
+    parsed: ParsedQuery
+    dense_vectors: dict[str, list[float]]
+    dense_error: str | None = None
 
 
 def build_meta_query(parsed: dict[str, Any]) -> str:
@@ -45,34 +53,65 @@ class Retriever:
         route_top_n: int, rrf_top_n: int,
     ) -> dict[str, Any]:
         started = perf_counter()
+        prepared = self.prepare(query)
+        result = self.search_prepared(
+            book_id=book_id, version=version, prepared=prepared,
+            route_top_n=route_top_n, rrf_top_n=rrf_top_n,
+        )
+        result["latency_ms"] = round((perf_counter() - started) * 1000, 2)
+        return result
+
+    def prepare(self, query: str) -> PreparedQuery:
         parsed = self.parser.parse(query)
         parsed_dict = parsed.model_dump()
         raw = parsed.raw_intent
         meta = build_meta_query(parsed_dict) or raw
         summary = parsed.summary_query or raw
+        try:
+            vectors = self.ollama.embed([raw, meta, summary])
+            if len(vectors) != 3:
+                raise StorageError("query embedding returned the wrong vector count")
+            return PreparedQuery(
+                parsed=parsed,
+                dense_vectors=dict(zip(
+                    ("text_dense", "meta_dense", "summary_dense"), vectors,
+                )),
+            )
+        except (StorageError, ValueError, TypeError) as exc:
+            return PreparedQuery(parsed=parsed, dense_vectors={}, dense_error=str(exc))
+
+    def search_prepared(
+        self, *, book_id: int, version: int, prepared: PreparedQuery,
+        route_top_n: int, rrf_top_n: int,
+    ) -> dict[str, Any]:
+        started = perf_counter()
+        parsed_dict = prepared.parsed.model_dump()
+        raw = prepared.parsed.raw_intent
         collection = scenes_collection_name(book_id, version)
         routes: dict[str, dict[str, Any]] = {}
         degraded: list[str] = []
         specs = (
-            ("text_dense", "text-dense", raw),
-            ("meta_dense", "meta-dense", meta),
-            ("summary_dense", "summary-dense", summary),
-            ("text_sparse", "text-sparse", raw),
+            ("text_dense", "text-dense"),
+            ("meta_dense", "meta-dense"),
+            ("summary_dense", "summary-dense"),
+            ("text_sparse", "text-sparse"),
         )
-        for route_name, vector_name, text in specs:
+        for route_name, vector_name in specs:
             route_started = perf_counter()
             route: dict[str, Any] = {"status": "ok", "items": [], "latency_ms": 0}
             try:
                 if vector_name == "text-sparse":
                     vector = build_sparse_vector(
-                        text, self.repository.get_token_map(book_id)
+                        raw, self.repository.get_token_map(book_id)
                     )
                     if not vector["indices"]:
                         route.update(status="skipped", reason="no_known_tokens")
                         routes[route_name] = route
                         continue
                 else:
-                    vector = self.ollama.embed([text])[0]
+                    if prepared.dense_error:
+                        raise StorageError(prepared.dense_error)
+                    vector = prepared.dense_vectors[route_name]
                 hits = self.qdrant.search(
                     collection, vector_name=vector_name, vector=vector,
                     limit=route_top_n, with_payload=True,

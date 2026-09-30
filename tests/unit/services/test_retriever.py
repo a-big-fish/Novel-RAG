@@ -27,7 +27,11 @@ class FakeParser:
 
 
 class FakeOllama:
+    def __init__(self):
+        self.calls = []
+
     def embed(self, texts):
+        self.calls.append(list(texts))
         return [[0.1, 0.2] for _ in texts]
 
 
@@ -49,9 +53,12 @@ class FakeQdrant:
 
 def test_retriever_keeps_four_routes_and_only_scene_preview():
     qdrant = FakeQdrant()
-    result = Retriever(FakeRepository(), qdrant, FakeOllama(), FakeParser(), Settings()).search(
+    ollama = FakeOllama()
+    result = Retriever(FakeRepository(), qdrant, ollama, FakeParser(), Settings()).search(
         book_id=7, version=2, query="雨夜", route_top_n=5, rrf_top_n=5,
     )
+    assert len(ollama.calls) == 1
+    assert len(ollama.calls[0]) == 3
     assert len(qdrant.calls) == 4
     assert result["routes"]["text_sparse"]["status"] == "ok"
     assert result["rrf"]["items"][0]["scene_id"] == 10
