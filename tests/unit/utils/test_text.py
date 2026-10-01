@@ -70,7 +70,21 @@ def test_bounded_sample_keeps_all_sections() -> None:
     assert sample.startswith("A")
     assert "B" in sample
     assert sample.endswith("C")
-    assert len(sample) <= 70
+    assert len(sample) <= 60
+
+
+def test_bounded_sample_counts_whitespace_in_model_limit() -> None:
+    text = "甲\n" * 2000
+    sample = bounded_sample(
+        text,
+        head_chars=1200,
+        middle_chars=1200,
+        tail_chars=1200,
+        max_chars=3600,
+    )
+    assert len(sample) <= 3600
+    assert sample.startswith("甲")
+    assert sample.endswith("甲")
 
 
 def test_bounded_sample_rejects_invalid_limit() -> None:
