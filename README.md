@@ -1,6 +1,6 @@
 # novel-rag
 
-面向小说写作范本检索的独立服务。上半链路负责构建可检索范本，下半链路提供单书检索实验与实时观察台。
+面向小说写作范本检索的独立服务。上半链路负责构建可检索范本，下半链路提供单书、多书检索实验与实时观察台。
 
 `源文件登记 -> EPUB/TXT 准备 -> 章节/场景拆分 -> Reference Evaluation -> selected Scene 深度标注 -> 向量化 -> PostgreSQL Archive + Qdrant Reference Index -> 组件级直查 API`
 
@@ -37,15 +37,25 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影，可在“检索实验”中并列查看四路结果与 RRF。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
 
-### 预览已有《马之途》数据
+### 预览隔离库中的真实书籍
 
-《马之途》当前保存在隔离库 `novel-rag-test-2`。若 `.env` 的 `POSTGRES_DB=novel_rag` 尚未迁移，直接打开看板会提示缺少项目表。使用以下命令可仅在服务进程中切换到隔离库，不改写 `.env`：
+本地隔离库 `novel-rag-test-2` 当前有三本已完成索引的书（2026-10-02 核对）：
+
+| 书名 | book_id | version | 总场景 | 入选并索引 | 归档 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 马之途 | 10 | 1 | 10 | 9 | 1 |
+| 备用联系人 | 43 | 1 | 99 | 64 | 35 |
+| 切勿操之过急 | 44 | 1 | 225 | 168 | 57 |
+
+新导入的两本 EPUB 均完整转换、切分并完成逐场景评估；PostgreSQL 保留全部场景，Qdrant 只存入选场景，向量点数分别为 64 和 168。书籍 ID 和数量是这个本地隔离库的快照，在其他数据库中请以 `GET /api/v1/books` 和看板为准。原书文件、转换缓存及数据库与向量库数据不属于 Git 提交内容。
+
+若 `.env` 的 `POSTGRES_DB=novel_rag` 尚未迁移，直接用普通启动命令打开看板会提示缺少项目表。以下脚本仅在服务进程中切换到隔离库，不改写 `.env`：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\start_dashboard_preview.ps1
 ```
 
-然后打开 `http://127.0.0.1:8000/dashboard`。正式库迁移和正式数据索引是独立操作；预览脚本不会执行它们。
+然后打开 `http://127.0.0.1:8007/dashboard`。预览脚本默认使用 8007 端口，可用 `-Port 8000` 等参数覆盖；正式库迁移和正式数据索引是独立操作，预览脚本不会执行它们。
 
 ## API
 
@@ -74,7 +84,7 @@ Qdrant 直查只接收调用方提供的原始向量；自然语言查询请使�
 多书请求示例：
 
 ```json
-{"query":"寻找雨夜追逐与冷峻短句的场景","book_ids":[10,11],"versions":{"10":1},"per_book_limit":20,"global_limit":50}
+{"query":"寻找人物关系紧张、对话带有试探意味的场景","book_ids":[10,43,44],"per_book_limit":20,"global_limit":50}
 ```
 
 `versions` 可省略；服务端在请求开始时固定各书当前版本。响应保留 `books` 内各书四路及 RRF 结果、逐书失败信息、`aggregation.items` 和 `final.items`。各书结果写结构化日志，不记录原文。某书失败不会抹去其他书结果；全部失败返回 503。跨书候选池使用轮流取候选，不直接比较不同书的 RRF 分数。
@@ -101,7 +111,7 @@ uv run python -B -m tests.real.run_ma_zhitu
 - 允许全量 EPUB 转 TXT 作为本地缓存。
 - 禁止把全量书或整章无界文本送入 LLM / Embedding。
 - 默认自动化模型测试只使用约 4000 字合成微型小说，或从 TXT 截取的开头/中间/结尾章节。
-- 手工验收固定使用 `tests/马之途.txt`；逐 Scene 有界调用，不把整本原文放入单次 Prompt。
+- `tests.real.run_ma_zhitu` 手工脚本使用 `tests/马之途.txt`。隔离库中的另外两本 EPUB 已完成全书索引；每次模型调用仍只接收单个场景的有界采样，不把整本原文放入单次 Prompt。
 
 ## 目录
 
