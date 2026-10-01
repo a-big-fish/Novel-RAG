@@ -35,7 +35,7 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 测试库迁移时增加 `--test`；迁移工具会固定使用 `novel-rag-test-2`，即使 `.env` 指向旧测试库。正式库只在准备部署时执行迁移。
 
-启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影，可在“检索实验”中并列查看四路结果与 RRF。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
+启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影。在“检索实验”可选当前书籍或多书聚合：提交后依次显示需求解析、查询向量生成、四路召回、书内 RRF 融合、跨书聚合及可选重排的实时阶段。多书结果展示每本书的召回数量、书内 RRF、跨书候选顺序；点击候选可回查完整场景原文和标注。详细事件记录可展开查看。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
 
 ### 预览隔离库中的真实书籍
 
@@ -74,12 +74,16 @@ Base path 为 `/api/v1`，健康检查为 `/health`。
 - `GET /api/v1/books/{book_id}/versions/{version}/projection`
 - `GET /api/v1/books/{book_id}/versions/{version}/compare?other_version=1`
 - `POST /api/v1/books/{book_id}/search`
+- `POST /api/v1/books/{book_id}/search/stream`
 - `POST /api/v1/search/multi`
+- `POST /api/v1/search/multi/stream`
 - `GET /api/v1/scenes/{scene_id}`
 - `POST /api/v1/qdrant/collections/{collection}/points/search`
 - `GET /api/v1/qdrant/collections/{collection}/points/{point_id}`
 
 Qdrant 直查只接收调用方提供的原始向量；自然语言查询请使用单书或多书 search 接口。RRF 列表返回 `scene_id` 与限长预览，完整原文通过版本化 Scene 详情接口获取。
+
+两个 `/stream` 接口使用与普通搜索相同的 JSON 请求体，返回 `application/x-ndjson`：`progress` 事件包含 `stage`，以及可能的 `book_id`、`route` 和完成数量；最终为 `result.data`，失败为 `error.message`。页面据此显示真实执行阶段，客户端需逐行读取响应流。
 
 多书请求示例：
 

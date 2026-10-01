@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.api.search_stream import search_stream
 from app.api.dependencies import (
     get_app_settings, get_ollama_client, get_qdrant_adapter,
     get_query_llm_client, get_repository,
@@ -25,15 +26,10 @@ class SearchRequest(BaseModel):
     rrf_top_n: int | None = Field(default=None, ge=1, le=100)
 
 
-@router.post("/{book_id}/search")
-def search_book(
+def _ready_version(
     book_id: int, payload: SearchRequest,
-    repository: PostgresRepository = Depends(get_repository),
-    qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
-    ollama: OllamaClient = Depends(get_ollama_client),
-    llm: JsonLLMClient = Depends(get_query_llm_client),
-    settings: Settings = Depends(get_app_settings),
-) -> dict:
+    repository: PostgresRepository, settings: Settings,
+) -> int:
     book = repository.get_book(book_id)
     if book is None:
         raise HTTPException(404, "book not found")
@@ -45,6 +41,19 @@ def search_book(
         raise HTTPException(404, "ready index version not found")
     if not payload.query.strip() or len(payload.query.strip()) > settings.query_max_chars:
         raise HTTPException(422, "query length is outside configured bounds")
+    return version
+
+
+@router.post("/{book_id}/search")
+def search_book(
+    book_id: int, payload: SearchRequest,
+    repository: PostgresRepository = Depends(get_repository),
+    qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
+    ollama: OllamaClient = Depends(get_ollama_client),
+    llm: JsonLLMClient = Depends(get_query_llm_client),
+    settings: Settings = Depends(get_app_settings),
+) -> dict:
+    version = _ready_version(book_id, payload, repository, settings)
     parser = QueryParser(repository, llm, settings)
     retriever = Retriever(repository, qdrant, ollama, parser, settings)
     try:
@@ -55,6 +64,27 @@ def search_book(
         )
     except RetrievalError as exc:
         raise HTTPException(503, str(exc)) from exc
+
+
+@router.post("/{book_id}/search/stream")
+def stream_book_search(
+    book_id: int, payload: SearchRequest,
+    repository: PostgresRepository = Depends(get_repository),
+    qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
+    ollama: OllamaClient = Depends(get_ollama_client),
+    llm: JsonLLMClient = Depends(get_query_llm_client),
+    settings: Settings = Depends(get_app_settings),
+):
+    version = _ready_version(book_id, payload, repository, settings)
+    retriever = Retriever(
+        repository, qdrant, ollama, QueryParser(repository, llm, settings), settings,
+    )
+    return search_stream(lambda publish: retriever.search(
+        book_id=book_id, version=version, query=payload.query,
+        route_top_n=payload.route_top_n or settings.query_route_top_n,
+        rrf_top_n=payload.rrf_top_n or settings.query_rrf_top_n,
+        on_progress=publish,
+    ))
 
 
 @router.get("/{book_id}/versions/{version}/scenes/{scene_id}")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from time import perf_counter
 from typing import Any
@@ -16,6 +17,9 @@ from app.utils.errors import StorageError
 
 class RetrievalError(StorageError):
     pass
+
+
+ProgressCallback = Callable[[str, dict[str, Any]], None]
 
 
 @dataclass(frozen=True)
@@ -51,22 +55,31 @@ class Retriever:
     def search(
         self, *, book_id: int, version: int, query: str,
         route_top_n: int, rrf_top_n: int,
+        on_progress: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         started = perf_counter()
-        prepared = self.prepare(query)
+        prepared = self.prepare(query, on_progress=on_progress)
         result = self.search_prepared(
             book_id=book_id, version=version, prepared=prepared,
             route_top_n=route_top_n, rrf_top_n=rrf_top_n,
+            on_progress=on_progress,
         )
         result["latency_ms"] = round((perf_counter() - started) * 1000, 2)
         return result
 
-    def prepare(self, query: str) -> PreparedQuery:
+    def prepare(
+        self, query: str, *, on_progress: ProgressCallback | None = None,
+    ) -> PreparedQuery:
+        if on_progress:
+            on_progress("parsing", {})
         parsed = self.parser.parse(query)
         parsed_dict = parsed.model_dump()
         raw = parsed.raw_intent
         meta = build_meta_query(parsed_dict) or raw
         summary = parsed.summary_query or raw
+
+        if on_progress:
+            on_progress("embedding", {"cache_hit": parsed.cache_hit})
         try:
             vectors = self.ollama.embed([raw, meta, summary])
             if len(vectors) != 3:
@@ -83,6 +96,7 @@ class Retriever:
     def search_prepared(
         self, *, book_id: int, version: int, prepared: PreparedQuery,
         route_top_n: int, rrf_top_n: int,
+        on_progress: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         started = perf_counter()
         parsed_dict = prepared.parsed.model_dump()
@@ -97,6 +111,8 @@ class Retriever:
             ("text_sparse", "text-sparse"),
         )
         for route_name, vector_name in specs:
+            if on_progress:
+                on_progress("retrieving", {"book_id": book_id, "route": route_name})
             route_started = perf_counter()
             route: dict[str, Any] = {"status": "ok", "items": [], "latency_ms": 0}
             try:
@@ -136,9 +152,17 @@ class Retriever:
             finally:
                 route["latency_ms"] = round((perf_counter() - route_started) * 1000, 2)
                 routes[route_name] = route
+                if on_progress:
+                    on_progress("route_complete", {
+                        "book_id": book_id, "route": route_name,
+                        "status": route["status"],
+                        "count": len(route["items"]),
+                    })
 
         if all(route["status"] != "ok" for route in routes.values()):
             raise RetrievalError("all retrieval routes failed or were skipped")
+        if on_progress:
+            on_progress("fusion", {"book_id": book_id})
         fused = reciprocal_rank_fusion(
             routes, k=self.settings.rrf_k, limit=rrf_top_n,
         )

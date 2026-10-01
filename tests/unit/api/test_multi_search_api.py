@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import (
@@ -92,5 +94,32 @@ def test_multi_search_api_uses_configured_reranker(monkeypatch):
         assert [item["scene_id"] for item in response.json()["final"]["items"]] == [
             201, 101,
         ]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_multi_search_stream_reports_aggregation_after_books():
+    app.dependency_overrides[get_repository] = CachedRepository
+    app.dependency_overrides[get_ollama_client] = FakeOllama
+    app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
+    app.dependency_overrides[get_query_llm_client] = FakeLLM
+    app.dependency_overrides[get_app_settings] = lambda: Settings(
+        multi_search_concurrency=2,
+    )
+    try:
+        response = TestClient(app).post(
+            "/api/v1/search/multi/stream",
+            json={"query": "雨夜", "book_ids": [1, 2]},
+        )
+        assert response.status_code == 200
+        events = [json.loads(line) for line in response.text.splitlines()]
+        stages = [event["stage"] for event in events if event["type"] == "progress"]
+        assert stages[:3] == ["checking_books", "parsing", "embedding"]
+        assert stages.count("book_complete") == 2
+        assert stages.index("aggregating") > max(
+            index for index, stage in enumerate(stages) if stage == "book_complete"
+        )
+        assert events[-1]["type"] == "result"
+        assert len(events[-1]["data"]["aggregation"]["items"]) == 2
     finally:
         app.dependency_overrides.clear()

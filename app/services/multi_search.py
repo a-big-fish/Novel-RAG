@@ -8,7 +8,7 @@ from typing import Any
 from app.clients.rerank_client import RerankClient
 from app.config import Settings
 from app.db.postgres import PostgresRepository
-from app.services.retriever import PreparedQuery, Retriever, RetrievalError
+from app.services.retriever import PreparedQuery, ProgressCallback, Retriever, RetrievalError
 from app.utils.errors import StorageError
 from app.utils.text import bounded_sample
 
@@ -147,6 +147,7 @@ class MultiBookSearcher:
     def _search_book(
         self, book_id: int, version: int, prepared: PreparedQuery,
         route_top_n: int, per_book_limit: int,
+        on_progress: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         started = perf_counter()
         last_error = "book search failed"
@@ -155,6 +156,7 @@ class MultiBookSearcher:
                 result = self.retriever.search_prepared(
                     book_id=book_id, version=version, prepared=prepared,
                     route_top_n=route_top_n, rrf_top_n=per_book_limit,
+                    on_progress=on_progress,
                 )
                 return {
                     **result,
@@ -178,8 +180,11 @@ class MultiBookSearcher:
         self, *, query: str, book_ids: list[int],
         versions: dict[int, int] | None = None,
         route_top_n: int, per_book_limit: int, global_limit: int,
+        on_progress: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         started = perf_counter()
+        if on_progress:
+            on_progress("checking_books", {"book_ids": book_ids})
         versions = versions or {}
         book_results: dict[int, dict[str, Any]] = {}
         targets: list[tuple[int, int]] = []
@@ -210,7 +215,7 @@ class MultiBookSearcher:
             self._log_book_results(book_ids, book_results)
             raise MultiBookSearchError("no requested book has a ready index version")
 
-        prepared = self.retriever.prepare(query)
+        prepared = self.retriever.prepare(query, on_progress=on_progress)
         with ThreadPoolExecutor(
             max_workers=min(len(targets), self.settings.multi_search_concurrency),
             thread_name_prefix="multi-book-search",
@@ -218,7 +223,7 @@ class MultiBookSearcher:
             futures = {
                 pool.submit(
                     self._search_book, book_id, version, prepared,
-                    route_top_n, per_book_limit,
+                    route_top_n, per_book_limit, on_progress,
                 ): book_id
                 for book_id, version in targets
             }
@@ -231,16 +236,25 @@ class MultiBookSearcher:
                     book_results[book_id] = {
                         "status": "failed", "error": "book search worker failed",
                     }
+                if on_progress:
+                    on_progress("book_complete", {
+                        "book_id": book_id,
+                        "status": book_results[book_id]["status"],
+                    })
 
         self._log_book_results(book_ids, book_results)
 
         if all(result["status"] != "ok" for result in book_results.values()):
             raise MultiBookSearchError("all requested book searches failed")
 
+        if on_progress:
+            on_progress("aggregating", {"book_ids": book_ids})
         candidates = interleave_candidates(
             book_results, book_ids,
             per_book_limit=per_book_limit, global_limit=global_limit,
         )
+        if on_progress and self.settings.rerank_enabled and candidates:
+            on_progress("reranking", {"count": min(len(candidates), self.settings.rerank_top_n)})
         rerank, final_items = self._rerank(prepared.parsed.raw_intent, candidates)
         logger.info(
             "multi_book_aggregation",
