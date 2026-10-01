@@ -175,7 +175,9 @@ def bounded_sample(
     if max_chars <= 0:
         raise ModelInputTooLargeError("max_chars must be positive")
     normalized = clean_text(text)
-    if normalized_char_count(normalized) <= max_chars:
+    # Downstream model clients enforce the actual string length, including
+    # whitespace. Use the same measure here so the sample cannot exceed it.
+    if len(normalized) <= max_chars:
         return normalized
 
     budgets = [max(0, head_chars), max(0, middle_chars), max(0, tail_chars)]
@@ -195,12 +197,12 @@ def bounded_sample(
     # section one character at a time; the configured maxima remain upper
     # bounds rather than minimums.
     sample = build()
-    while normalized_char_count(sample) > max_chars and any(budgets):
+    while len(sample) > max_chars and any(budgets):
         index = max(range(3), key=lambda item: budgets[item])
         budgets[index] -= 1
         sample = build()
 
-    if normalized_char_count(sample) > max_chars:
+    if len(sample) > max_chars:
         raise ModelInputTooLargeError(
             "sampling configuration cannot satisfy max_chars"
         )
