@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import (
@@ -57,5 +59,27 @@ def test_search_api_pins_ready_version_and_returns_four_routes():
         assert response.json()["version"] == 2
         assert response.json()["routes"]["text_sparse"]["status"] == "skipped"
         assert client.post("/api/v1/books/3/search", json={"query": "雨夜", "version": 3}).status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_search_stream_reports_real_stages_before_result():
+    app.dependency_overrides[get_repository] = FakeRepository
+    app.dependency_overrides[get_ollama_client] = FakeOllama
+    app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
+    app.dependency_overrides[get_query_llm_client] = FakeLLM
+    app.dependency_overrides[get_app_settings] = lambda: Settings()
+    try:
+        response = TestClient(app).post(
+            "/api/v1/books/3/search/stream", json={"query": "雨夜"},
+        )
+        assert response.status_code == 200
+        events = [json.loads(line) for line in response.text.splitlines()]
+        stages = [event["stage"] for event in events if event["type"] == "progress"]
+        assert stages[:3] == ["parsing", "embedding", "retrieving"]
+        assert stages.count("route_complete") == 4
+        assert stages[-1] == "fusion"
+        assert events[-1]["type"] == "result"
+        assert events[-1]["data"]["version"] == 2
     finally:
         app.dependency_overrides.clear()
