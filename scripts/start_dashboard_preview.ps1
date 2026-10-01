@@ -1,6 +1,6 @@
 param(
     [ValidateRange(1, 65535)]
-    [int]$Port = 8000
+    [int]$Port = 8007
 )
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
