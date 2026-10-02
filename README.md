@@ -35,7 +35,7 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 测试库迁移时增加 `--test`；迁移工具会固定使用 `novel-rag-test-2`，即使 `.env` 指向旧测试库。正式库只在准备部署时执行迁移。
 
-启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影。在“检索实验”可选当前书籍或多书聚合：提交后依次显示需求解析、查询向量生成、四路召回、书内 RRF 融合、跨书聚合及可选重排的实时阶段。多书结果展示每本书的召回数量、书内 RRF、跨书候选顺序；点击候选可回查完整场景原文和标注。详细事件记录可展开查看。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
+启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影。在“检索实验”可选当前书籍或多书聚合：提交后依次显示需求解析、查询向量生成、四路召回、书内 RRF 融合、跨书聚合及可选重排的实时阶段。点击阶段可查看解析后的查询 JSON、向量化输入、各书各路召回数量与耗时、融合及聚合统计、重排状态；耗时达到 1 秒时以秒显示。多书结果展示每本书的召回数量、书内 RRF、跨书候选顺序；点击候选可回查完整场景原文和标注。详细事件记录可展开查看。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
 
 ### 预览隔离库中的真实书籍
 
@@ -93,7 +93,7 @@ Qdrant 直查只接收调用方提供的原始向量；自然语言查询请使�
 
 `versions` 可省略；服务端在请求开始时固定各书当前版本。响应保留 `books` 内各书四路及 RRF 结果、逐书失败信息、`aggregation.items` 和 `final.items`。各书结果写结构化日志，不记录原文。某书失败不会抹去其他书结果；全部失败返回 503。跨书候选池使用轮流取候选，不直接比较不同书的 RRF 分数。
 
-默认 `RERANK_ENABLED=true`。直接使用 `OLLAMA_URL` 上的 `OLLAMA_RERANK_MODEL`，对聚合后的前 `RERANK_TOP_N` 条候选逐条计算 Qwen3-Reranker 的 yes/no token 概率；其余候选保持原顺序接在后面。`RERANK_CONCURRENCY` 控制同时提交给 Ollama 的评分请求。`RERANK_TIMEOUT_SECONDS` 默认为 180 秒，覆盖模型冷加载和排队时间；临时网络错误或 Ollama 429/502/503/504 会重试一次。Ollama 最多返回前 20 个候选 token 的概率；若 yes 或 no 超出范围，候选会得到保守边界分数并标记 `rerank_score_exact=false`，响应同时给出 `censored_count`。模型或服务失败会在 `rerank.status` 标明，并让 `final.items` 使用完整聚合顺序。该模型调用需要 Ollama `/api/generate` 支持 `logprobs` 和 `top_logprobs`，开启后会增加推理延迟；若当前机器不运行重排模型，可在 `.env` 设为 `RERANK_ENABLED=false`。
+默认 `RERANK_ENABLED=true`。直接使用 `OLLAMA_URL` 上的 `OLLAMA_RERANK_MODEL`，对聚合后的前 `RERANK_TOP_N` 条候选逐条计算 Qwen3-Reranker 的 yes/no token 概率；其余候选保持原顺序接在后面。`RERANK_CONCURRENCY` 控制同时提交给 Ollama 的评分请求，默认 1，避免并发请求使模型服务承压。`RERANK_TIMEOUT_SECONDS` 默认为 180 秒，覆盖模型冷加载和排队时间；临时网络错误或 Ollama 429/500/502/503/504 会重试一次。Ollama 最多返回前 20 个候选 token 的概率；若 yes 或 no 超出范围，候选会得到保守边界分数并标记 `rerank_score_exact=false`，响应同时给出 `censored_count`。模型或服务失败会在 `rerank.status` 标明，并让 `final.items` 使用完整聚合顺序。该模型调用需要 Ollama `/api/generate` 支持 `logprobs` 和 `top_logprobs`，开启后会增加推理延迟；若当前机器不运行重排模型，可在 `.env` 设为 `RERANK_ENABLED=false`。
 
 对 `ready` 书籍再次调用索引接口会构建新 version；旧 version 在新 version 通过 selected-point 一致性校验并激活前保持可用。
 

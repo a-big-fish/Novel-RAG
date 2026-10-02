@@ -120,3 +120,25 @@ def test_rerank_client_reports_persistent_timeout_type():
         reranker.rerank("雨夜", ["场景甲"])
     assert attempts == 2
     client.close()
+
+
+def test_rerank_client_retries_ollama_500_for_one_candidate():
+    attempts = 0
+
+    def handle(_request):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return httpx.Response(500, text="temporary model worker failure")
+        return response_with_logits(-0.1, -3.0)
+
+    client = httpx.Client(
+        base_url="http://ollama.test", transport=httpx.MockTransport(handle),
+    )
+    reranker = RerankClient(
+        base_url="http://ollama.test", model="my-ollama-reranker",
+        timeout_seconds=3, client=client,
+    )
+    assert reranker.rerank("雨夜", ["场景甲"])[0]["score"] > 0.9
+    assert attempts == 2
+    client.close()

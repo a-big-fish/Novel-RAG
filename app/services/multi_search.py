@@ -183,6 +183,7 @@ class MultiBookSearcher:
         on_progress: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         started = perf_counter()
+        check_started = perf_counter()
         if on_progress:
             on_progress("checking_books", {"book_ids": book_ids})
         versions = versions or {}
@@ -210,6 +211,15 @@ class MultiBookSearcher:
                 }
                 continue
             targets.append((book_id, version))
+
+        if on_progress:
+            on_progress("checking_books_complete", {
+                "versions": {book_id: version for book_id, version in targets},
+                "failed_books": {
+                    book_id: result["error"] for book_id, result in book_results.items()
+                },
+                "latency_ms": round((perf_counter() - check_started) * 1000, 2),
+            })
 
         if not targets:
             self._log_book_results(book_ids, book_results)
@@ -240,6 +250,10 @@ class MultiBookSearcher:
                     on_progress("book_complete", {
                         "book_id": book_id,
                         "status": book_results[book_id]["status"],
+                        "version": book_results[book_id].get("version"),
+                        "attempts": book_results[book_id].get("attempts"),
+                        "latency_ms": book_results[book_id].get("latency_ms"),
+                        "error": book_results[book_id].get("error"),
                     })
 
         self._log_book_results(book_ids, book_results)
@@ -249,13 +263,22 @@ class MultiBookSearcher:
 
         if on_progress:
             on_progress("aggregating", {"book_ids": book_ids})
+        aggregate_started = perf_counter()
         candidates = interleave_candidates(
             book_results, book_ids,
             per_book_limit=per_book_limit, global_limit=global_limit,
         )
+        if on_progress:
+            on_progress("aggregating_complete", {
+                "count": len(candidates),
+                "strategy": "round_robin_book_rrf",
+                "latency_ms": round((perf_counter() - aggregate_started) * 1000, 2),
+            })
         if on_progress and self.settings.rerank_enabled and candidates:
             on_progress("reranking", {"count": min(len(candidates), self.settings.rerank_top_n)})
         rerank, final_items = self._rerank(prepared.parsed.raw_intent, candidates)
+        if on_progress and self.settings.rerank_enabled and candidates:
+            on_progress("reranking_complete", rerank)
         logger.info(
             "multi_book_aggregation",
             extra={
