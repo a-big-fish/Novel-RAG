@@ -41,16 +41,26 @@ class RerankClient:
             f"{_PREFIX}<Instruct>: {_INSTRUCTION}\n"
             f"<Query>: {query}\n<Document>: {document}{_SUFFIX}"
         )
+        payload = {
+            "model": self.model, "prompt": prompt, "raw": True,
+            "stream": False, "logprobs": True, "top_logprobs": 20,
+            "options": {"temperature": 0, "num_predict": 1},
+        }
+        for attempt in range(2):
+            try:
+                response = self.client.post("/api/generate", json=payload)
+                response.raise_for_status()
+                break
+            except httpx.HTTPError as exc:
+                retryable = isinstance(exc, httpx.TransportError) or (
+                    isinstance(exc, httpx.HTTPStatusError)
+                    and exc.response.status_code in {429, 502, 503, 504}
+                )
+                if attempt or not retryable:
+                    raise StorageError(
+                        f"Ollama rerank failed ({type(exc).__name__}): {exc}"
+                    ) from exc
         try:
-            response = self.client.post(
-                "/api/generate",
-                json={
-                    "model": self.model, "prompt": prompt, "raw": True,
-                    "stream": False, "logprobs": True, "top_logprobs": 20,
-                    "options": {"temperature": 0, "num_predict": 1},
-                },
-            )
-            response.raise_for_status()
             alternatives = response.json()["logprobs"][0]["top_logprobs"]
             logprobs = {
                 item["token"]: float(item["logprob"])
@@ -71,8 +81,10 @@ class RerankClient:
                 return 1.0 / (1.0 + exp(logprobs["no"] - logprobs["yes"])), True
             ratio = exp(logprobs["yes"] - logprobs["no"])
             return ratio / (1.0 + ratio), True
-        except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError) as exc:
-            raise StorageError(f"Ollama rerank failed: {exc}") from exc
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            raise StorageError(
+                f"Ollama rerank failed ({type(exc).__name__}): {exc}"
+            ) from exc
 
     def rerank(self, query: str, documents: list[str]) -> list[dict[str, float | int | bool]]:
         if not documents:

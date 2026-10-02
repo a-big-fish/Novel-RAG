@@ -80,10 +80,10 @@ class Settings(BaseSettings):
     multi_search_attempts: int = Field(default=2, ge=1, le=3)
     multi_search_per_book_limit: int = Field(default=20, ge=1, le=100)
     multi_search_global_limit: int = Field(default=50, ge=1, le=500)
-    rerank_enabled: bool = False
+    rerank_enabled: bool = True
     rerank_top_n: int = Field(default=10, ge=1, le=100)
     rerank_concurrency: int = Field(default=2, ge=1, le=8)
-    rerank_timeout_seconds: float = Field(default=60.0, gt=0)
+    rerank_timeout_seconds: float = Field(default=180.0, gt=0)
     rerank_max_document_chars: int = Field(default=3600, ge=500, le=20000)
     log_level: str = "INFO"
 
