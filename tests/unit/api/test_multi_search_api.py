@@ -33,7 +33,7 @@ def test_multi_search_api_returns_book_scoped_candidates():
     app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
     app.dependency_overrides[get_query_llm_client] = FakeLLM
     app.dependency_overrides[get_app_settings] = lambda: Settings(
-        multi_search_concurrency=2,
+        multi_search_concurrency=2, rerank_enabled=False,
     )
     try:
         client = TestClient(app)
@@ -104,7 +104,7 @@ def test_multi_search_stream_reports_aggregation_after_books():
     app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
     app.dependency_overrides[get_query_llm_client] = FakeLLM
     app.dependency_overrides[get_app_settings] = lambda: Settings(
-        multi_search_concurrency=2,
+        multi_search_concurrency=2, rerank_enabled=False,
     )
     try:
         response = TestClient(app).post(
@@ -114,12 +114,22 @@ def test_multi_search_stream_reports_aggregation_after_books():
         assert response.status_code == 200
         events = [json.loads(line) for line in response.text.splitlines()]
         stages = [event["stage"] for event in events if event["type"] == "progress"]
-        assert stages[:3] == ["checking_books", "parsing", "embedding"]
+        assert stages[:3] == ["checking_books", "checking_books_complete", "parsing"]
+        parsed = next(event for event in events if event.get("stage") == "parsing_complete")
+        assert parsed["parsed_query"]["summary_query"] == "雨夜场景"
+        assert parsed["latency_ms"] >= 0
+        embedded = next(event for event in events if event.get("stage") == "embedding_complete")
+        assert embedded["dimension"] == 2
+        assert embedded["latency_ms"] >= 0
+        assert all(event["latency_ms"] >= 0 for event in events
+                   if event.get("stage") == "route_complete")
+        assert stages.count("fusion_complete") == 2
         assert stages.count("book_complete") == 2
         assert stages.index("aggregating") > max(
             index for index, stage in enumerate(stages) if stage == "book_complete"
         )
         assert events[-1]["type"] == "result"
         assert len(events[-1]["data"]["aggregation"]["items"]) == 2
+        assert stages.index("aggregating_complete") > stages.index("aggregating")
     finally:
         app.dependency_overrides.clear()

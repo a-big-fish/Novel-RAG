@@ -22,7 +22,7 @@ class RerankClient:
 
     def __init__(
         self, *, base_url: str, model: str, timeout_seconds: float,
-        concurrency: int = 2,
+        concurrency: int = 1,
         client: httpx.Client | None = None,
     ) -> None:
         self.model = model
@@ -54,7 +54,7 @@ class RerankClient:
             except httpx.HTTPError as exc:
                 retryable = isinstance(exc, httpx.TransportError) or (
                     isinstance(exc, httpx.HTTPStatusError)
-                    and exc.response.status_code in {429, 502, 503, 504}
+                    and exc.response.status_code in {429, 500, 502, 503, 504}
                 )
                 if attempt or not retryable:
                     raise StorageError(

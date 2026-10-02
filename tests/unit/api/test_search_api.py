@@ -76,9 +76,9 @@ def test_search_stream_reports_real_stages_before_result():
         assert response.status_code == 200
         events = [json.loads(line) for line in response.text.splitlines()]
         stages = [event["stage"] for event in events if event["type"] == "progress"]
-        assert stages[:3] == ["parsing", "embedding", "retrieving"]
+        assert stages[:3] == ["parsing", "parsing_complete", "embedding"]
         assert stages.count("route_complete") == 4
-        assert stages[-1] == "fusion"
+        assert stages[-1] == "fusion_complete"
         assert events[-1]["type"] == "result"
         assert events[-1]["data"]["version"] == 2
     finally:

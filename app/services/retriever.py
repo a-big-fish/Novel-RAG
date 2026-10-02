@@ -70,20 +70,38 @@ class Retriever:
     def prepare(
         self, query: str, *, on_progress: ProgressCallback | None = None,
     ) -> PreparedQuery:
+        parse_started = perf_counter()
         if on_progress:
             on_progress("parsing", {})
         parsed = self.parser.parse(query)
         parsed_dict = parsed.model_dump()
+        if on_progress:
+            on_progress("parsing_complete", {
+                "parsed_query": parsed_dict,
+                "latency_ms": round((perf_counter() - parse_started) * 1000, 2),
+            })
         raw = parsed.raw_intent
         meta = build_meta_query(parsed_dict) or raw
         summary = parsed.summary_query or raw
 
+        embed_started = perf_counter()
+        embed_model = getattr(self.ollama, "model", self.settings.ollama_embed_model)
         if on_progress:
-            on_progress("embedding", {"cache_hit": parsed.cache_hit})
+            on_progress("embedding", {
+                "model": embed_model,
+                "inputs": {"text_dense": raw, "meta_dense": meta,
+                           "summary_dense": summary},
+            })
         try:
             vectors = self.ollama.embed([raw, meta, summary])
             if len(vectors) != 3:
                 raise StorageError("query embedding returned the wrong vector count")
+            if on_progress:
+                on_progress("embedding_complete", {
+                    "status": "ok", "model": embed_model,
+                    "dimension": len(vectors[0]),
+                    "latency_ms": round((perf_counter() - embed_started) * 1000, 2),
+                })
             return PreparedQuery(
                 parsed=parsed,
                 dense_vectors=dict(zip(
@@ -91,6 +109,11 @@ class Retriever:
                 )),
             )
         except (StorageError, ValueError, TypeError) as exc:
+            if on_progress:
+                on_progress("embedding_complete", {
+                    "status": "failed", "error": str(exc),
+                    "latency_ms": round((perf_counter() - embed_started) * 1000, 2),
+                })
             return PreparedQuery(parsed=parsed, dense_vectors={}, dense_error=str(exc))
 
     def search_prepared(
@@ -157,12 +180,15 @@ class Retriever:
                         "book_id": book_id, "route": route_name,
                         "status": route["status"],
                         "count": len(route["items"]),
+                        "latency_ms": route["latency_ms"],
+                        "reason": route.get("reason") or route.get("error"),
                     })
 
         if all(route["status"] != "ok" for route in routes.values()):
             raise RetrievalError("all retrieval routes failed or were skipped")
         if on_progress:
             on_progress("fusion", {"book_id": book_id})
+        fusion_started = perf_counter()
         fused = reciprocal_rank_fusion(
             routes, k=self.settings.rrf_k, limit=rrf_top_n,
         )
@@ -181,6 +207,12 @@ class Retriever:
                 "summary": scene["summary"],
                 "style_summary": scene["style_summary"],
                 "usage_hint": scene["usage_hint"],
+            })
+        if on_progress:
+            on_progress("fusion_complete", {
+                "book_id": book_id, "count": len(fused),
+                "k": self.settings.rrf_k,
+                "latency_ms": round((perf_counter() - fusion_started) * 1000, 2),
             })
         return {
             "book_id": book_id, "version": version,
