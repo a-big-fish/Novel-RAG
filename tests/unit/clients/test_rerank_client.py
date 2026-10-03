@@ -1,4 +1,5 @@
 import json
+import logging
 
 import httpx
 import pytest
@@ -122,7 +123,7 @@ def test_rerank_client_reports_persistent_timeout_type():
     client.close()
 
 
-def test_rerank_client_retries_ollama_500_for_one_candidate():
+def test_rerank_client_retries_ollama_500_for_one_candidate(caplog):
     attempts = 0
 
     def handle(_request):
@@ -139,6 +140,44 @@ def test_rerank_client_retries_ollama_500_for_one_candidate():
         base_url="http://ollama.test", model="my-ollama-reranker",
         timeout_seconds=3, client=client,
     )
-    assert reranker.rerank("雨夜", ["场景甲"])[0]["score"] > 0.9
+    with caplog.at_level(logging.INFO, logger="app.clients.rerank_client"):
+        assert reranker.rerank("雨夜", ["场景甲"])[0]["score"] > 0.9
     assert attempts == 2
+    failures = [record for record in caplog.records if record.msg == "rerank_request_failed"]
+    assert len(failures) == 1
+    assert (failures[0].candidate_index, failures[0].attempt,
+            failures[0].status_code, failures[0].will_retry) == (0, 1, 500, True)
+    assert failures[0].response_body == "temporary model worker failure"
+    assert failures[0].batch_id == reranker.batch_id
+    assert any(record.msg == "rerank_candidate_scored" for record in caplog.records)
+    client.close()
+
+
+def test_rerank_client_logs_persistent_500_with_candidate_index(caplog):
+    attempts = 0
+
+    def handle(_request):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            return response_with_logits(-0.1, -3.0)
+        return httpx.Response(500, text="model worker ran out of memory")
+
+    client = httpx.Client(
+        base_url="http://ollama.test",
+        transport=httpx.MockTransport(handle),
+    )
+    reranker = RerankClient(
+        base_url="http://ollama.test", model="my-ollama-reranker",
+        timeout_seconds=3, client=client,
+    )
+    with caplog.at_level(logging.INFO, logger="app.clients.rerank_client"):
+        with pytest.raises(StorageError, match="candidate 2 failed"):
+            reranker.rerank("雨夜", ["场景甲", "场景乙", "场景丙"])
+    failures = [record for record in caplog.records if record.msg == "rerank_request_failed"]
+    assert [(record.candidate_index, record.attempt, record.will_retry)
+            for record in failures] == [(1, 1, True), (1, 2, False)]
+    assert all(record.response_body == "model worker ran out of memory"
+               for record in failures)
+    assert attempts == 3  # The third candidate is not sent after a final failure.
     client.close()

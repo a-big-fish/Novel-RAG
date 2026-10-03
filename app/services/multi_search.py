@@ -89,8 +89,17 @@ class MultiBookSearcher:
 
         started = perf_counter()
         evaluated = candidates[:self.settings.rerank_top_n]
+        batch_id = getattr(self.reranker, "batch_id", None)
+        logger.info("multi_book_rerank_started", extra={
+            "batch_id": batch_id,
+            "model": self.settings.ollama_rerank_model,
+            "candidate_count": len(evaluated),
+            "available_candidate_count": len(candidates),
+            "concurrency": self.settings.rerank_concurrency,
+            "document_char_limit": self.settings.rerank_max_document_chars,
+        })
         documents: list[str] = []
-        for item in evaluated:
+        for index, item in enumerate(evaluated):
             scene = self.repository.get_scene(item["scene_id"])
             if (scene is None or int(scene["book_id"]) != item["book_id"]
                     or int(scene["version"]) != item["version"]
@@ -110,6 +119,12 @@ class MultiBookSearcher:
                 max_chars=max(1, budget - len(header)),
             )
             documents.append((header + excerpt)[:budget])
+            logger.info("multi_book_rerank_candidate_prepared", extra={
+                "batch_id": batch_id,
+                "candidate_index": index, "scene_id": item["scene_id"],
+                "book_id": item["book_id"], "version": item["version"],
+                "document_chars": len(documents[-1]),
+            })
 
         try:
             scores = self.reranker.rerank(query, documents)
@@ -120,6 +135,13 @@ class MultiBookSearcher:
             }
             if len(by_index) != len(evaluated) or set(by_index) != set(range(len(evaluated))):
                 raise StorageError("rerank scores do not cover all candidates")
+            for index, item in enumerate(evaluated):
+                logger.info("multi_book_rerank_candidate_result", extra={
+                    "batch_id": batch_id,
+                    "candidate_index": index, "scene_id": item["scene_id"],
+                    "book_id": item["book_id"], "score": by_index[index],
+                    "score_exact": exact_by_index[index],
+                })
             ordered = sorted(
                 (dict(
                     item, rerank_score=by_index[index],
@@ -131,14 +153,24 @@ class MultiBookSearcher:
             ordered.extend(candidates[len(evaluated):])
             for rank, item in enumerate(ordered, start=1):
                 item["rerank_rank"] = rank
+            latency_ms = round((perf_counter() - started) * 1000, 2)
+            logger.info("multi_book_rerank_completed", extra={
+                "batch_id": batch_id,
+                "candidate_count": len(evaluated), "latency_ms": latency_ms,
+                "censored_count": sum(not exact for exact in exact_by_index.values()),
+            })
             return {
                 "status": "ok", "model": self.settings.ollama_rerank_model,
                 "evaluated_count": len(evaluated),
                 "censored_count": sum(not exact for exact in exact_by_index.values()),
-                "latency_ms": round((perf_counter() - started) * 1000, 2),
+                "latency_ms": latency_ms,
             }, ordered
         except StorageError as exc:
-            logger.warning("multi-book rerank failed: %s", exc)
+            logger.exception("multi_book_rerank_failed", extra={
+                "batch_id": batch_id,
+                "candidate_count": len(evaluated),
+                "latency_ms": round((perf_counter() - started) * 1000, 2),
+            })
             return {
                 "status": "failed", "reason": str(exc),
                 "latency_ms": round((perf_counter() - started) * 1000, 2),
