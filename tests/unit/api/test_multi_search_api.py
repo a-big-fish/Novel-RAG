@@ -3,9 +3,10 @@ import json
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import (
-    get_app_settings, get_ollama_client, get_qdrant_adapter,
+    get_app_settings, get_multi_search_settings, get_ollama_client, get_qdrant_adapter,
     get_query_llm_client, get_repository,
 )
+from app import config
 from app.config import Settings
 from app.main import app
 from app.api.routes import multi_search as multi_search_route
@@ -32,7 +33,7 @@ def test_multi_search_api_returns_book_scoped_candidates():
     app.dependency_overrides[get_ollama_client] = FakeOllama
     app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
     app.dependency_overrides[get_query_llm_client] = FakeLLM
-    app.dependency_overrides[get_app_settings] = lambda: Settings(
+    app.dependency_overrides[get_multi_search_settings] = lambda: Settings(
         multi_search_concurrency=2, rerank_enabled=False,
     )
     try:
@@ -80,7 +81,7 @@ def test_multi_search_api_uses_configured_reranker(monkeypatch):
     app.dependency_overrides[get_ollama_client] = FakeOllama
     app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
     app.dependency_overrides[get_query_llm_client] = FakeLLM
-    app.dependency_overrides[get_app_settings] = lambda: Settings(
+    app.dependency_overrides[get_multi_search_settings] = lambda: Settings(
         rerank_enabled=True, ollama_url="http://ollama.test:11434",
         ollama_rerank_model="my-ollama-reranker",
     )
@@ -98,12 +99,53 @@ def test_multi_search_api_uses_configured_reranker(monkeypatch):
         app.dependency_overrides.clear()
 
 
-def test_multi_search_stream_reports_aggregation_after_books():
+def test_multi_search_api_reloads_rerank_switch_without_restart(tmp_path, monkeypatch):
+    class FakeRerankClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        def rerank(self, _query, documents):
+            return [{"index": index, "score": float(index)}
+                    for index in range(len(documents))]
+
+        def close(self):
+            pass
+
+    env_file = tmp_path / ".env"
+    monkeypatch.setattr(config, "RERANK_ENV_FILE", env_file)
+    monkeypatch.setattr(multi_search_route, "RerankClient", FakeRerankClient)
     app.dependency_overrides[get_repository] = CachedRepository
     app.dependency_overrides[get_ollama_client] = FakeOllama
     app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
     app.dependency_overrides[get_query_llm_client] = FakeLLM
     app.dependency_overrides[get_app_settings] = lambda: Settings(
+        _env_file=None, rerank_enabled=None,
+    )
+    try:
+        client = TestClient(app)
+        env_file.write_text("RERANK_ENABLED=false\n", encoding="utf-8")
+        disabled = client.post(
+            "/api/v1/search/multi", json={"query": "雨夜", "book_ids": [1, 2]},
+        )
+        assert disabled.status_code == 200
+        assert disabled.json()["rerank"]["status"] == "disabled"
+
+        env_file.write_text("RERANK_ENABLED=true\n", encoding="utf-8")
+        enabled = client.post(
+            "/api/v1/search/multi", json={"query": "雨夜", "book_ids": [1, 2]},
+        )
+        assert enabled.status_code == 200
+        assert enabled.json()["rerank"]["status"] == "ok"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_multi_search_stream_reports_aggregation_after_books():
+    app.dependency_overrides[get_repository] = CachedRepository
+    app.dependency_overrides[get_ollama_client] = FakeOllama
+    app.dependency_overrides[get_qdrant_adapter] = FakeQdrant
+    app.dependency_overrides[get_query_llm_client] = FakeLLM
+    app.dependency_overrides[get_multi_search_settings] = lambda: Settings(
         multi_search_concurrency=2, rerank_enabled=False,
     )
     try:

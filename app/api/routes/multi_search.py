@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from app.api.search_stream import search_stream
 from app.api.dependencies import (
-    get_app_settings, get_ollama_client, get_qdrant_adapter,
+    get_multi_search_settings, get_ollama_client, get_qdrant_adapter,
     get_query_llm_client, get_repository,
 )
 from app.clients.llm_client import JsonLLMClient
@@ -88,7 +88,7 @@ def search_multiple_books(
     qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
     ollama: OllamaClient = Depends(get_ollama_client),
     llm: JsonLLMClient = Depends(get_query_llm_client),
-    settings: Settings = Depends(get_app_settings),
+    settings: Settings = Depends(get_multi_search_settings),
 ) -> dict:
     _validate_payload(payload, settings)
     try:
@@ -104,7 +104,7 @@ def stream_multiple_books(
     qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
     ollama: OllamaClient = Depends(get_ollama_client),
     llm: JsonLLMClient = Depends(get_query_llm_client),
-    settings: Settings = Depends(get_app_settings),
+    settings: Settings = Depends(get_multi_search_settings),
 ):
     _validate_payload(payload, settings)
     return search_stream(lambda publish: _run_search(
