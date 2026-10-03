@@ -16,8 +16,10 @@
   .progress-rail{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}.progress-phase{padding:3px 9px;border:1px solid var(--line);color:var(--quiet);font-size:12px}.progress-phase.current{border-color:var(--red);color:var(--red);background:#fbf0eb}.progress-phase.done{color:var(--green);border-color:#b9c7b8}.progress-log{margin-top:10px;border-top:1px solid var(--line);padding-top:7px}.progress-log summary{cursor:pointer;color:var(--quiet);font-size:12px}.progress-steps{margin-top:8px}.progress-step{padding:2px 7px}.progress-steps .progress-step:last-child{color:var(--ink)}
   button.progress-phase{background:transparent;cursor:pointer;font:12px var(--sans)}button.progress-phase:hover,button.progress-phase.selected{border-color:var(--red);color:var(--red);background:#fbf0eb}.progress-detail{margin-top:12px;padding:12px 14px;border:1px solid var(--line);background:#f7f4ed}.progress-detail-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.progress-detail h3{font:700 15px var(--serif);margin:0}.progress-detail p{font-size:13px;margin:8px 0;color:var(--quiet)}.progress-detail pre{max-height:270px;overflow:auto;margin:8px 0 0;padding:10px;background:var(--white);border:1px solid var(--line);font:12px/1.6 Consolas,"Courier New",monospace;white-space:pre-wrap;overflow-wrap:anywhere}.progress-detail table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}.progress-detail th,.progress-detail td{text-align:left;border-bottom:1px solid var(--line);padding:5px 8px;vertical-align:top}.progress-detail th{color:var(--quiet);font-weight:500}.progress-detail td:last-child{overflow-wrap:anywhere}.progress-detail .detail-row{font-size:13px;margin-top:6px}.progress-detail .detail-row b{color:var(--ink)}
   button.progress-phase.failed{border-color:var(--red);color:var(--red)}
+  .rerank-board{border:1px solid var(--line);background:var(--white);margin-top:20px}.rerank-head{display:flex;justify-content:space-between;gap:16px;align-items:start;padding:17px 20px;border-bottom:1px solid var(--line)}.rerank-head h2{font:700 23px var(--serif)}.rerank-head p{margin:4px 0 0;color:var(--quiet);font-size:13px}.rerank-count{flex:none;color:var(--red);font:700 28px var(--serif)}.rerank-list{display:grid}.rerank-hit{display:grid;grid-template-columns:56px minmax(0,1fr) 185px;gap:14px;align-items:start;width:100%;padding:14px 20px;text-align:left;background:none;border:0;border-bottom:1px solid var(--line)}.rerank-hit:last-child{border-bottom:0}.rerank-hit:hover{background:#f3eee7}.rerank-position{color:var(--red);font:700 26px var(--serif)}.rerank-main{min-width:0;border-left:3px solid var(--book-color);padding-left:12px}.rerank-main strong{display:block;font:700 16px var(--serif)}.rerank-main small{display:block;color:var(--quiet);font-size:12px}.rerank-main .rerank-preview{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;margin-top:5px;font-size:13px;line-height:1.6}.rerank-evidence{display:grid;gap:5px;justify-items:start;font-size:12px}.rerank-movement{color:var(--quiet)}.rerank-movement.up{color:var(--green)}.rerank-movement.down{color:var(--red)}.rerank-score{font-weight:700}.rerank-score-note{color:var(--quiet);font-size:11px}.score-track{display:block;width:100%;height:4px;background:#e6e0d5}.score-track span{display:block;height:100%;background:var(--green)}.rerank-extra,.pool-details{border-top:1px solid var(--line);padding:0 20px}.rerank-extra summary,.pool-details summary{cursor:pointer;padding:12px 0;color:var(--red);font-size:13px;font-weight:700}.rerank-extra .global-list,.pool-details .global-list{border:0;border-top:1px solid var(--line);margin-bottom:14px}.rerank-extra .global-hit,.pool-details .global-hit{padding-left:4px;padding-right:4px}.rerank-fallback{padding:14px 20px;color:var(--red);font-size:13px;overflow-wrap:anywhere}.aggregate-layout.with-rerank{margin-top:18px}.aggregate-layout.with-rerank .pool-details{border:1px solid var(--line);background:var(--white);padding:0 18px;align-self:start}.aggregate-layout.with-rerank .pool-details .aggregate-head{padding:12px 4px}.rerank-board .empty{padding:20px}
   @media(max-width:900px){.aggregate-layout{grid-template-columns:1fr}.book-lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.book-lane-item{border-bottom:0;border-right:1px solid var(--line)}}
   @media(max-width:1080px){.work{grid-template-columns:240px minmax(0,1fr)}.work .panel:last-child{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}}@media(max-width:720px){.head{padding:16px;flex-wrap:wrap;gap:8px}.selectors{width:100%;margin-left:0}.selectors .field{flex:1}.field select{width:100%;min-width:0}main{padding:0 16px 50px}.summary{grid-template-columns:repeat(2,1fr)}.metric{border-bottom:1px solid var(--line)}.work{display:block}.panel+.panel{border-left:0;border-top:1px solid var(--line)}.search-form{display:block}.search-form textarea{width:100%}.primary{padding:10px 20px;margin-top:8px}.routes{grid-template-columns:repeat(5,190px)}.data-grid{grid-template-columns:1fr}}
+  @media(max-width:720px){.rerank-head{padding:14px}.rerank-count{font-size:23px}.rerank-hit{grid-template-columns:40px minmax(0,1fr);gap:10px;padding:13px 14px}.rerank-position{font-size:20px}.rerank-evidence{grid-column:2;grid-template-columns:1fr 1fr;align-items:center}.score-track{grid-column:1/-1}.rerank-extra,.pool-details{padding:0 14px}}
 </style>
 </head>
 <body>
@@ -80,8 +82,96 @@ function eventPhase(stage){if(stage==='route_complete'||stage==='retrieving')ret
 function showProgress(event){state.progressEvents.push(event);const id=event.book_id;const route=event.route;const stage=event.stage;const phase=eventPhase(stage);let title=progressLabels[stage]||progressLabels[phase]||stage;if(route)title+=` · ${labels[route]||route}`;if(stage==='route_complete')title+=`（${event.count} 条，${event.status}，${formatDuration(event.latency_ms)}）`;if(stage==='book_complete')title+=`（${event.status}）`;const current=stage==='route_complete'?`${labels[route]||route}已召回 ${event.count} 条`:stage==='book_complete'?`检索${event.status==='ok'?'完成':'失败'}`:stage.endsWith('_complete')?`${progressLabels[phase]||phase}已完成`:`正在${progressLabels[phase]||phase}${route?` · ${labels[route]||route}`:''}`;$('progress-current').textContent=id?`${bookTitle(id)}：${current}`:current;const rail=$('progress-rail');const phases=[...rail.children];const index=phases.findIndex(item=>item.dataset.stage===phase);if(index>=0){const active=Math.max(index,Number(rail.dataset.activeIndex));rail.dataset.activeIndex=active;phases.forEach((item,i)=>{item.classList.toggle('done',i<active);item.classList.toggle('current',i===active)})}updatePhaseLabels();$('progress-steps').append(node('span',id?`${bookTitle(id)} · ${title}`:title,'progress-step'));$('progress-count').textContent=$('progress-steps').children.length;if(id){const item=$('live-books').querySelector(`[data-book-id="${id}"]`);if(item)item.textContent=`${bookTitle(id)}：${stage==='book_complete'?(event.status==='ok'?'已返回':'失败'):stage==='fusion'?'书内融合中':'检索中'}`}if(state.selectedPhase)renderProgressDetail()}
 async function readSearchStream(url,payload,onProgress){const response=await fetch(api+url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!response.ok){let body;try{body=await response.json()}catch{}throw Error(body?.detail||`请求失败 (${response.status})`)}if(!response.body)throw Error('浏览器不支持流式响应');const reader=response.body.getReader();const decoder=new TextDecoder();let pending='';let result;while(true){const {value,done}=await reader.read();pending+=decoder.decode(value||new Uint8Array(),{stream:!done});let newline;while((newline=pending.indexOf('\n'))!==-1){const line=pending.slice(0,newline).trim();pending=pending.slice(newline+1);if(!line)continue;const event=JSON.parse(line);if(event.type==='progress')onProgress(event);else if(event.type==='error')throw Error(event.message);else if(event.type==='result')result=event.data}if(done)break}if(!result)throw Error('检索流未返回结果');return result}
 function renderSingleSearch(result){$('routes').classList.remove('hidden');$('multi-results').classList.add('hidden');clear($('routes'));for(const name of ['text_dense','meta_dense','summary_dense','text_sparse'])$('routes').append(routeCard(name,result.routes[name],result.book_id,result.version));$('routes').append(routeCard('rrf',result.rrf,result.book_id,result.version));$('query-note').textContent=`解析：${result.parsed_query.summary_query||'沿用原始需求'} · ${result.parsed_query.fallback?'已降级为原始需求':'结构化查询'}${result.parsed_query.cache_hit?' · 命中缓存':''} · ${formatDuration(result.latency_ms)}`}
-function renderRankList(host,title,note,items,ids){const section=node('section',undefined,'global-list');const head=node('div',undefined,'aggregate-head');head.append(node('h2',title),node('p',note));section.append(head);for(const [index,hit] of items.entries()){const button=node('button',undefined,'global-hit');button.style.setProperty('--book-color',bookColor(hit.book_id,ids));const content=node('span',undefined,'global-hit-body');content.append(node('b',`${bookTitle(hit.book_id)} · Scene ${hit.scene_index_in_book}`),node('small',`书内 RRF #${hit.book_rrf_rank} · 场景 ID ${hit.scene_id} · v${hit.version}${hit.rerank_score===undefined?'':` · 重排 ${Number(hit.rerank_score).toFixed(3)}`}`),node('span',(hit.summary||hit.text_preview||'暂无摘要').slice(0,110)));button.append(node('span',index+1,'global-rank'),content);button.onclick=()=>loadScene(hit.scene_id,'result-detail',hit.book_id,hit.version);section.append(button)}if(!items.length)section.append(node('div','没有可展示的候选场景','empty'));host.append(section)}
-function renderMultiSearch(result){$('routes').classList.add('hidden');$('multi-results').classList.remove('hidden');clear($('multi-results'));const ids=result.book_ids;const layout=node('div',undefined,'aggregate-layout');const books=node('section',undefined,'book-lane');const head=node('div',undefined,'aggregate-head');head.append(node('h2','各书召回'),node('p','每本书独立执行四路检索和无权重 RRF'));books.append(head);const lanes=node('div',undefined,'book-lanes');for(const id of ids){const data=result.books[String(id)];const lane=node('div',undefined,'book-lane-item');lane.style.setProperty('--book-color',bookColor(id,ids));lane.append(node('b',`${bookTitle(id)} · ${data.status==='ok'?`v${data.version}`:'检索失败'}`),node('small',data.status==='ok'?`书内 RRF ${data.rrf.items.length} 条 · ${formatDuration(data.latency_ms)} · ${data.attempts} 次尝试`:data.error||'无法检索'));if(data.status==='ok'){lane.append(node('div',Object.entries(data.routes).map(([route,item])=>`${labels[route]} ${item.items.length} 条 · ${formatDuration(item.latency_ms)}${item.status==='ok'?'':`（${item.status}）`}`).join(' · '),'route-status'));const details=node('details');details.append(node('summary','查看这本书的四路召回与 RRF'));details.ontoggle=()=>{if(!details.open||details.children.length>1)return;const grid=node('div',undefined,'routes book-routes');for(const route of ['text_dense','meta_dense','summary_dense','text_sparse'])grid.append(routeCard(route,data.routes[route],id,data.version));grid.append(routeCard('rrf',data.rrf,id,data.version));details.append(grid)};lane.append(details)}lanes.append(lane)}books.append(lanes);layout.append(books);const ordered=node('div');renderRankList(ordered,'跨书候选池',`按书内 RRF 名次轮流汇集 · ${result.aggregation.items.length} 条；不直接比较不同书的 RRF 分数`,result.aggregation.items,ids);if(result.rerank.status==='ok')renderRankList(ordered,'最终重排',`Ollama ${result.rerank.model} · 前 ${result.rerank.evaluated_count} 条参与评分 · ${formatDuration(result.rerank.latency_ms)}`,result.final.items,ids);else if(result.rerank.status==='failed')ordered.append(node('p',`重排失败，最终结果沿用聚合顺序：${result.rerank.reason}`,'query-note'));layout.append(ordered);$('multi-results').append(layout);const rerankText={ok:'已完成',disabled:'未启用',failed:'失败，沿用聚合顺序',skipped:'无候选'};$('query-note').textContent=`解析：${result.parsed_query.summary_query||'沿用原始需求'} · ${result.parsed_query.cache_hit?'命中缓存':'新解析'} · ${ids.length} 本书 · ${formatDuration(result.latency_ms)} · 重排：${rerankText[result.rerank.status]||result.rerank.status}`}
+function renderRankList(host,title,note,items,ids,offset=0){
+  const section=node('section',undefined,'global-list');
+  const head=node('div',undefined,'aggregate-head');
+  head.append(node('h2',title),node('p',note));section.append(head);
+  for(const [index,hit] of items.entries()){
+    const button=node('button',undefined,'global-hit');
+    button.style.setProperty('--book-color',bookColor(hit.book_id,ids));
+    const content=node('span',undefined,'global-hit-body');
+    content.append(node('b',`${bookTitle(hit.book_id)} · 场景 ${hit.scene_index_in_book}`),node('small',`书内 RRF #${hit.book_rrf_rank} · 场景 ID ${hit.scene_id} · v${hit.version}`),node('span',(hit.summary||hit.text_preview||'暂无摘要').slice(0,110)));
+    button.append(node('span',index+offset+1,'global-rank'),content);
+    button.onclick=()=>loadScene(hit.scene_id,'result-detail',hit.book_id,hit.version);
+    section.append(button);
+  }
+  if(!items.length)section.append(node('div','没有可展示的候选场景','empty'));
+  host.append(section);
+}
+function renderRerankBoard(result,ids){
+  const board=node('section',undefined,'rerank-board');
+  const head=node('div',undefined,'rerank-head');
+  const title=node('div');title.append(node('h2','最终重排结果'));
+  const scored=result.final.items.filter(hit=>hit.rerank_score!==undefined);
+  const remaining=result.final.items.length-scored.length;
+  title.append(node('p',`Ollama ${result.rerank.model} · ${scored.length} 条已评分 · ${remaining} 条沿用聚合顺序 · ${formatDuration(result.rerank.latency_ms)}`));
+  title.append(node('p','模型分数为 0–1，仅用于本批已评分候选的相对排序；分数越高越靠前。'));
+  if(result.rerank.censored_count)title.append(node('p',`${result.rerank.censored_count} 条为边界分数，yes/no 未同时进入模型返回的候选 token。`));
+  head.append(title,node('span',`${scored.length} / ${result.final.items.length}`,'rerank-count'));board.append(head);
+  const list=node('div',undefined,'rerank-list');
+  for(const [index,hit] of scored.entries()){
+    const rank=index+1,oldRank=Number(hit.candidate_rank);
+    const movement=oldRank-rank;
+    const button=node('button',undefined,'rerank-hit');button.type='button';
+    button.style.setProperty('--book-color',bookColor(hit.book_id,ids));
+    const main=node('span',undefined,'rerank-main');
+    main.append(node('strong',`${bookTitle(hit.book_id)} · 场景 ${hit.scene_index_in_book}`),node('small',`书内 RRF #${hit.book_rrf_rank} · 场景 ID ${hit.scene_id} · v${hit.version}`),node('span',(hit.summary||hit.text_preview||'暂无摘要').slice(0,180),'rerank-preview'));
+    const evidence=node('span',undefined,'rerank-evidence');
+    evidence.append(node('span',`聚合第 ${oldRank} → 重排第 ${rank}${movement>0?` · ↑${movement}`:movement<0?` · ↓${-movement}`:' · 持平'}`,`rerank-movement ${movement>0?'up':movement<0?'down':''}`));
+    evidence.append(node('span',`模型分数 ${Number(hit.rerank_score).toFixed(3)}`,'rerank-score'));
+    const track=node('span',undefined,'score-track');const fill=node('span');fill.style.width=`${Math.max(0,Math.min(100,Number(hit.rerank_score)*100))}%`;track.append(fill);evidence.append(track);
+    if(hit.rerank_score_exact===false)evidence.append(node('span','边界分数','rerank-score-note'));
+    button.append(node('span',`#${rank}`,'rerank-position'),main,evidence);
+    button.onclick=()=>loadScene(hit.scene_id,'result-detail',hit.book_id,hit.version);
+    list.append(button);
+  }
+  if(!scored.length)list.append(node('div','模型未返回可展示的评分','empty'));
+  board.append(list);
+  if(remaining>0){
+    const extra=node('details',undefined,'rerank-extra');extra.append(node('summary',`查看其余 ${remaining} 条未评分候选（顺序保持不变）`));
+    extra.ontoggle=()=>{if(extra.open&&extra.children.length===1)renderRankList(extra,'其余候选','这些候选未进入模型评分，沿用原聚合顺序。',result.final.items.slice(scored.length),ids,scored.length)};
+    board.append(extra);
+  }
+  return board;
+}
+function renderMultiSearch(result){
+  $('routes').classList.add('hidden');$('multi-results').classList.remove('hidden');clear($('multi-results'));
+  const ids=result.book_ids;
+  if(result.rerank.status==='ok')$('multi-results').append(renderRerankBoard(result,ids));
+  else if(result.rerank.status==='failed'){
+    const failed=node('section',undefined,'rerank-board');
+    const head=node('div',undefined,'rerank-head');head.append(node('h2','重排未完成'));
+    failed.append(head,node('p',`最终结果沿用聚合顺序。原因：${result.rerank.reason}`,'rerank-fallback'));
+    $('multi-results').append(failed);
+  }
+  const layout=node('div',undefined,`aggregate-layout${result.rerank.status==='ok'?' with-rerank':''}`);
+  const books=node('section',undefined,'book-lane');const head=node('div',undefined,'aggregate-head');
+  head.append(node('h2','各书召回'),node('p','每本书独立执行四路检索和无权重 RRF'));books.append(head);
+  const lanes=node('div',undefined,'book-lanes');
+  for(const id of ids){
+    const data=result.books[String(id)],lane=node('div',undefined,'book-lane-item');
+    lane.style.setProperty('--book-color',bookColor(id,ids));
+    lane.append(node('b',`${bookTitle(id)} · ${data.status==='ok'?`v${data.version}`:'检索失败'}`),node('small',data.status==='ok'?`书内 RRF ${data.rrf.items.length} 条 · ${formatDuration(data.latency_ms)} · ${data.attempts} 次尝试`:data.error||'无法检索'));
+    if(data.status==='ok'){
+      lane.append(node('div',Object.entries(data.routes).map(([route,item])=>`${labels[route]} ${item.items.length} 条 · ${formatDuration(item.latency_ms)}${item.status==='ok'?'':`（${item.status}）`}`).join(' · '),'route-status'));
+      const details=node('details');details.append(node('summary','查看这本书的四路召回与 RRF'));
+      details.ontoggle=()=>{if(!details.open||details.children.length>1)return;const grid=node('div',undefined,'routes book-routes');for(const route of ['text_dense','meta_dense','summary_dense','text_sparse'])grid.append(routeCard(route,data.routes[route],id,data.version));grid.append(routeCard('rrf',data.rrf,id,data.version));details.append(grid)};
+      lane.append(details);
+    }
+    lanes.append(lane);
+  }
+  books.append(lanes);layout.append(books);
+  const pool=node('details',undefined,'pool-details');
+  pool.append(node('summary',`查看重排前的跨书候选顺序（${result.aggregation.items.length} 条）`));
+  pool.ontoggle=()=>{if(pool.open&&pool.children.length===1)renderRankList(pool,'跨书候选池','按各书 RRF 名次轮流汇集，不直接比较不同书的 RRF 分数。',result.aggregation.items,ids)};
+  if(result.rerank.status!=='ok'){
+    renderRankList(pool,'跨书候选池','按各书 RRF 名次轮流汇集，不直接比较不同书的 RRF 分数。',result.aggregation.items,ids);
+    pool.open=true;
+  }
+  layout.append(pool);$('multi-results').append(layout);
+  const rerankText={ok:'已完成',disabled:'未启用',failed:'失败，沿用聚合顺序',skipped:'无候选'};
+  $('query-note').textContent=`解析：${result.parsed_query.summary_query||'沿用原始需求'} · ${result.parsed_query.cache_hit?'命中缓存':'新解析'} · ${ids.length} 本书 · ${formatDuration(result.latency_ms)} · 重排：${rerankText[result.rerank.status]||result.rerank.status}`;
+}
 async function runSearch(event){event.preventDefault();if(state.busy)return;const mode=$('search-mode').value;const query=$('query').value.trim();if(!query)return;if(mode==='single'&&!state.version){status('请先选择有索引版本的书籍',true);return}const ids=mode==='single'?[state.book]:selectedBookIds();if(mode==='multi'&&ids.length<2){status('多书聚合请至少选择两本已索引的书',true);return}state.busy=true;$('search-submit').disabled=true;resetProgress(ids);clear($('routes'));clear($('multi-results'));$('result-detail').classList.add('hidden');$('query-note').textContent='正在读取检索过程…';status('检索已开始');try{const url=mode==='single'?`/books/${state.book}/search/stream`:'/search/multi/stream';const payload=mode==='single'?{query,version:Number(state.version),route_top_n:20,rrf_top_n:20}:{query,book_ids:ids,per_book_limit:20,global_limit:50};const result=await readSearchStream(url,payload,showProgress);state.search=result;if(mode==='single')renderSingleSearch(result);else renderMultiSearch(result);for(const item of $('progress-rail').children)item.classList.remove('current'),item.classList.add('done');if(mode==='multi'&&['disabled','failed'].includes(result.rerank.status)){$('progress-rail').lastChild.classList.remove('done');$('progress-rail').lastChild.classList.toggle('failed',result.rerank.status==='failed');$('progress-rail').lastChild.textContent=result.rerank.status==='failed'?'重排失败':'重排未启用'}if(mode==='single')for(const item of $('live-books').children)item.textContent=bookTitle(state.book)+'：已完成';$('progress-current').textContent='检索完成';$('progress-meta').textContent=`${formatDuration(result.latency_ms)}`;status(mode==='single'?`检索完成 · ${result.rrf.items.length} 条融合结果`:`聚合完成 · ${result.aggregation.items.length} 条候选 · ${result.degraded_books.length} 本降级`)}catch(e){$('progress-current').textContent=`检索未完成：${e.message}`;status(e.message,true)}finally{state.busy=false;$('search-submit').disabled=false}}
 $('book').onchange=async()=>{state.book=Number($('book').value);await loadVersions()};$('version').onchange=async()=>{state.version=Number($('version').value);state.offset=0;await loadObserve()};$('filter').onchange=()=>{state.offset=0;loadScenes()};$('prev').onclick=()=>{state.offset=Math.max(0,state.offset-50);loadScenes()};$('next').onclick=()=>{state.offset+=50;loadScenes()};$('vector').onchange=loadProjection;$('search-mode').onchange=()=>{$('book-picker').classList.toggle('hidden',$('search-mode').value!=='multi');$('query-note').textContent=$('search-mode').value==='multi'?'选中至少两本书，查看书内召回和跨书聚合。':'结果只来自当前选定的书籍与版本。'};$('search-form').onsubmit=runSearch;
 for(const name of ['observe','search'])$('tab-'+name).onclick=()=>{for(const tab of ['observe','search']){$('tab-'+tab).classList.toggle('active',tab===name);$(tab).classList.toggle('hidden',tab!==name)}};
