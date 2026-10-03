@@ -3,8 +3,24 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from dotenv import dotenv_values
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+RERANK_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+
+
+def read_rerank_enabled() -> bool:
+    """Read the rerank switch from .env for each search request."""
+    value = dotenv_values(RERANK_ENV_FILE, encoding="utf-8").get("RERANK_ENABLED")
+    if value is None:
+        raise ValueError(f"RERANK_ENABLED is missing from {RERANK_ENV_FILE}")
+    normalized = value.strip().lower()
+    if normalized in {"true", "1", "yes", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "off"}:
+        return False
+    raise ValueError(f"RERANK_ENABLED must be true or false in {RERANK_ENV_FILE}")
 
 
 class Settings(BaseSettings):
@@ -80,7 +96,7 @@ class Settings(BaseSettings):
     multi_search_attempts: int = Field(default=2, ge=1, le=3)
     multi_search_per_book_limit: int = Field(default=20, ge=1, le=100)
     multi_search_global_limit: int = Field(default=50, ge=1, le=500)
-    rerank_enabled: bool = True
+    rerank_enabled: bool | None = None
     rerank_top_n: int = Field(default=10, ge=1, le=100)
     rerank_concurrency: int = Field(default=1, ge=1, le=8)
     rerank_timeout_seconds: float = Field(default=180.0, gt=0)
