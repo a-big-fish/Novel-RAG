@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import logging
+import codecs
+import hashlib
+import os
+import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import (
@@ -55,6 +59,10 @@ class StartIndexResponse(BaseModel):
     index_started: bool
 
 
+_UPLOAD_SUFFIXES = {".epub", ".txt", ".md"}
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
 def _validate_source_path(source_path: str, settings: Settings) -> Path:
     path = Path(source_path).expanduser().resolve()
     if not path.is_file():
@@ -80,6 +88,97 @@ def _detect_source_format(path: Path) -> str:
     if b"\x00" in sample:
         raise SourceValidationError("TXT source contains binary NUL bytes")
     return "txt"
+
+
+def _validate_uploaded_epub(path: Path) -> None:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            if (
+                archive.read("mimetype").strip() != b"application/epub+zip"
+                or "META-INF/container.xml" not in archive.namelist()
+            ):
+                raise ValueError("not an EPUB package")
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile) as exc:
+        raise SourceValidationError("上传文件不是有效的 EPUB") from exc
+
+
+@router.post("/upload", response_model=AddBookResponse, status_code=status.HTTP_201_CREATED)
+async def upload_book(
+    file: UploadFile = File(...),
+    title: str = Form(..., min_length=1, max_length=300),
+    author: str = Form("", max_length=300),
+    settings: Settings = Depends(get_app_settings),
+    repository: PostgresRepository = Depends(get_repository),
+) -> AddBookResponse:
+    """Store a browser upload and register it without starting the indexer."""
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in _UPLOAD_SUFFIXES:
+        raise HTTPException(422, "仅支持 .epub、.txt 和 .md 文件")
+    upload_dir = (settings.book_source_dir / "uploads").resolve()
+    if not any(upload_dir.is_relative_to(root) for root in settings.allowed_roots):
+        raise HTTPException(503, "上传目录不在 ALLOWED_SOURCE_ROOTS 中")
+    if not title.strip():
+        raise HTTPException(422, "书名不能为空")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    destination: Path | None = None
+    destination_created = False
+    registered = False
+    try:
+        with tempfile.NamedTemporaryFile(dir=upload_dir, suffix=".part", delete=False) as stream:
+            temp_path = Path(stream.name)
+            digest = hashlib.sha256()
+            decoder = codecs.getincrementaldecoder("utf-8-sig")("strict") if suffix != ".epub" else None
+            size = 0
+            while chunk := await file.read(_UPLOAD_CHUNK_BYTES):
+                size += len(chunk)
+                if size > settings.book_upload_max_bytes:
+                    raise SourceValidationError("上传文件超过大小限制")
+                if decoder is not None:
+                    if b"\x00" in chunk:
+                        raise SourceValidationError("文本包含二进制空字节")
+                    try:
+                        decoder.decode(chunk)
+                    except UnicodeDecodeError as exc:
+                        raise SourceValidationError("文本必须使用 UTF-8 编码") from exc
+                digest.update(chunk)
+                stream.write(chunk)
+            if size == 0:
+                raise SourceValidationError("上传文件为空")
+            if decoder is not None:
+                try:
+                    decoder.decode(b"", final=True)
+                except UnicodeDecodeError as exc:
+                    raise SourceValidationError("文本必须使用 UTF-8 编码") from exc
+        if suffix == ".epub":
+            _validate_uploaded_epub(temp_path)
+        source_format = "epub" if suffix == ".epub" else "txt"
+        destination = upload_dir / f"{digest.hexdigest()}{suffix}"
+        if not destination.exists():
+            os.replace(temp_path, destination)
+            temp_path = None
+            destination_created = True
+        book_id, created = repository.register_book(
+            title=title.strip(), author=author.strip(), source_path=str(destination),
+            source_format=source_format, source_sha256=digest.hexdigest(),
+        )
+        registered = created
+        if not created and destination_created:
+            destination.unlink(missing_ok=True)
+            destination_created = False
+        return AddBookResponse(
+            book_id=book_id, status="pending" if created else str(repository.get_book(book_id)["status"]),
+            source_format=source_format, created=created,
+        )
+    except SourceValidationError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    finally:
+        await file.close()
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+        if destination_created and not registered and destination is not None:
+            # A failed registration must not leave an orphaned source file.
+            destination.unlink(missing_ok=True)
 
 
 def _run_index(

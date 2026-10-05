@@ -43,6 +43,7 @@ class Settings(BaseSettings):
 
     book_source_dir: Path = Path("E:/novels/tool")
     allowed_source_roots: str = "E:/novels/tool"
+    book_upload_max_bytes: int = Field(default=100 * 1024 * 1024, ge=1)
     data_books_dir: Path = Path("data/books")
     data_converted_dir: Path = Path("data/converted")
     epub_converter_version: str = "epub-v1"
