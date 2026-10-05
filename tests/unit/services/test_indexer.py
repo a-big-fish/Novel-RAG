@@ -118,6 +118,29 @@ def test_txt_prepare_uses_current_source_hash(tmp_path: Path) -> None:
     assert "第二版正文" in second.read_text(encoding="utf-8")
 
 
+def test_list_stage_records_item_count_for_dashboard() -> None:
+    class JobRepository(FakeRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.job_update: dict[str, Any] = {}
+
+        def create_job(self, book_id: int, stage: str, *, total_items: int) -> int:
+            assert (book_id, stage, total_items) == (1, "split", 0)
+            return 27
+
+        def update_job(self, job_id: int, **values: Any) -> None:
+            assert job_id == 27
+            self.job_update = values
+
+    repository = JobRepository()
+    indexer = _indexer(repository, Settings(_env_file=None))
+    result = indexer._run_job(1, "split", lambda: [{"id": 1}, {"id": 2}])
+    assert len(result) == 2
+    assert repository.job_update["status"] == "completed"
+    assert repository.job_update["done_items"] == 2
+    assert repository.job_update["total_items"] == 2
+
+
 def test_close_releases_owned_clients() -> None:
     repository = FakeRepository()
     indexer = _indexer(repository, Settings(_env_file=None))

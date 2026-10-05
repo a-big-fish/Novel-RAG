@@ -16,6 +16,7 @@ PostgreSQL 保留全部 Final Scene；Qdrant 只保留具有写作参考价值�
 - LLM 支持 `openai_compatible` 与 `codex_exec` 两种适配器
 - OpenAI 兼容适配器对 408 / 429 / 5xx 和网络错误做有限指数退避重试
 - `add_new_book` 只登记、不解析；`start_index` 显式启动索引
+- 看板“导入书籍”支持上传 EPUB、UTF-8 TXT、UTF-8 MD：先登记，再选小说后启动索引；个人摘抄入口暂显示正在开发
 - 模型输入始终经过章节/场景拆分或有界采样，禁止整书进入 LLM
 - TXT 章节解析支持普通章节行及 Markdown `#` / `##` / `###` 标题
 
@@ -36,6 +37,8 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 测试库迁移时增加 `--test`；迁移工具会固定使用 `novel-rag-test-2`，即使 `.env` 指向旧测试库。正式库只在准备部署时执行迁移。
 
 启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影。在“检索实验”可选当前书籍或多书聚合：提交后依次显示需求解析、查询向量生成、四路召回、书内 RRF 融合、跨书聚合及可选重排的实时阶段。点击阶段可查看解析后的查询 JSON、向量化输入、各书各路召回数量与耗时、融合及聚合统计、重排状态；耗时达到 1 秒时以秒显示。多书结果将最终重排置顶，逐条标明聚合前后名次、升降幅度、模型分数和来源书籍；未评分候选及重排前顺序可展开查看。每本书的召回数量和书内 RRF 也单独展示；点击候选可回查完整场景原文和标注。详细事件记录可展开查看。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
+
+“导入书籍”页选择本机 EPUB、TXT 或 MD 后填写书名与作者。上传 API 流式保存文件到 `BOOK_SOURCE_DIR/uploads`，受 `ALLOWED_SOURCE_ROOTS` 和 `BOOK_UPLOAD_MAX_BYTES` 限制；MD 选为小说时沿用 TXT 解析流程。登记成功弹出类型选择，“小说”启动后台索引，“自己的摘抄”暂提示正在开发。索引页轮询书籍状态与持久化 `index_jobs`，按准备、切分、评估、标注、向量化、写入索引、激活版本显示阶段、耗时和错误；刷新后可继续查看。旧索引记录没有独立“写入索引”任务时会标明未单独记录。
 
 ### 预览隔离库中的真实书籍
 
@@ -62,6 +65,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start_dashboard_preview.ps1
 Base path 为 `/api/v1`，健康检查为 `/health`。
 
 - `POST /api/v1/books`
+- `POST /api/v1/books/upload`（multipart：`file`、`title`、可选 `author`；只登记）
 - `GET /api/v1/books`
 - `POST /api/v1/books/{book_id}/index`
 - `GET /api/v1/books/{book_id}`

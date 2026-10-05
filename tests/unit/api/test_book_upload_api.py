@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.dependencies import get_app_settings, get_repository
+from app.api.dependencies import get_app_settings, get_indexer_factory, get_repository
 from app.config import Settings
 from app.main import app
 from tests.fixtures.build_synthetic_epub import write_synthetic_epub
-from tests.unit.api.test_books_api import FakeRepository
+from tests.unit.api.test_books_api import FakeIndexer, FakeRepository
 
 
 @pytest.fixture
@@ -128,3 +128,32 @@ def test_duplicate_content_reuses_book_and_discards_second_upload(tmp_path: Path
     assert second.json()["book_id"] == first.json()["book_id"]
     assert len(repository.books) == 1
     assert len(list((tmp_path / "uploads").iterdir())) == 1
+
+
+def test_uploaded_book_stays_pending_until_index_is_explicitly_started(upload_client):
+    client, repository, _ = upload_client
+    created: list[FakeIndexer] = []
+
+    def factory(repo):
+        indexer = FakeIndexer(repo)
+        created.append(indexer)
+        return indexer
+
+    app.dependency_overrides[get_indexer_factory] = lambda: factory
+    try:
+        upload = client.post(
+            "/api/v1/books/upload",
+            data={"title": "新书"},
+            files={"file": ("book.md", "# 第一章\n正文。".encode())},
+        )
+        book_id = upload.json()["book_id"]
+        assert repository.get_book(book_id)["status"] == "pending"
+        assert created == []
+        started = client.post(f"/api/v1/books/{book_id}/index")
+    finally:
+        app.dependency_overrides.pop(get_indexer_factory, None)
+
+    assert started.status_code == 202
+    assert started.json()["index_started"] is True
+    assert created[0].ran is True
+    assert repository.get_book(book_id)["status"] == "ready"

@@ -115,13 +115,14 @@ class Indexer:
             )
             raise
         done_items = (
-            int(result.get("total", total_items))
-            if isinstance(result, Mapping)
+            int(result.get("total", total_items)) if isinstance(result, Mapping)
+            else len(result) if isinstance(result, list)
             else total_items
         )
         self.repository.update_job(
             job_id,
             status="completed",
+            total_items=done_items if isinstance(result, list) and not total_items else None,
             done_items=done_items,
             finished=True,
         )
@@ -299,6 +300,34 @@ class Indexer:
             )
         return points
 
+    def _store_points(
+        self,
+        *,
+        book_id: int,
+        version: int,
+        points: list[dict[str, Any]],
+        selected_rows: list[dict[str, Any]],
+        total_scenes: int,
+    ) -> tuple[str, int]:
+        collection_name = self.qdrant.create_scenes_collection(book_id, version)
+        self.qdrant.upsert_scene_points(collection_name, points)
+        for scene in selected_rows:
+            self.repository.update_scene(
+                int(scene["id"]), index_status="indexed", error_message=None,
+            )
+        indexed_count = len(self.repository.list_scenes(
+            book_id, version, reference_status="selected",
+            annotate_status="annotated", index_status="indexed",
+        ))
+        qdrant_count = self.qdrant.count(collection_name)
+        if indexed_count != qdrant_count:
+            raise NovelRagError(
+                "index consistency check failed: "
+                f"selected_indexed={indexed_count}, "
+                f"qdrant={qdrant_count}, total_scenes={total_scenes}"
+            )
+        return collection_name, indexed_count
+
     def run(self, book_id: int) -> dict[str, Any]:
         book = self.repository.get_book(book_id)
         if book is None:
@@ -404,34 +433,16 @@ class Indexer:
                 ),
                 total_items=len(selected_rows),
             )
-            collection_name = self.qdrant.create_scenes_collection(
+            collection_name, indexed_selected_count = self._run_job(
                 book_id,
-                version,
+                "store",
+                lambda: self._store_points(
+                    book_id=book_id, version=version, points=points,
+                    selected_rows=selected_rows,
+                    total_scenes=len(all_scene_rows),
+                ),
+                total_items=len(points),
             )
-            self.qdrant.upsert_scene_points(collection_name, points)
-            for scene in selected_rows:
-                self.repository.update_scene(
-                    int(scene["id"]),
-                    index_status="indexed",
-                    error_message=None,
-                )
-
-            indexed_selected_count = len(
-                self.repository.list_scenes(
-                    book_id,
-                    version,
-                    reference_status="selected",
-                    annotate_status="annotated",
-                    index_status="indexed",
-                )
-            )
-            qdrant_count = self.qdrant.count(collection_name)
-            if indexed_selected_count != qdrant_count:
-                raise NovelRagError(
-                    "index consistency check failed: "
-                    f"selected_indexed={indexed_selected_count}, "
-                    f"qdrant={qdrant_count}, total_scenes={len(all_scene_rows)}"
-                )
             self._run_job(
                 book_id,
                 "sync",
