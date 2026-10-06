@@ -123,6 +123,7 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
         data_converted_dir=tmp_path / "converted",
         llm_concurrency=1,
         max_llm_input_chars=3600,
+        scene_min_chars=1,
         max_embed_input_chars=3600,
         tag_vocab_version="v1",
     )

@@ -104,6 +104,21 @@ def test_postgres_repository_round_trip() -> None:
         )
         assert len(repository.list_scenes(book_id, 1)) == 1
 
+        repository.upsert_scenes(
+            book_id, 2,
+            [{
+                "scene_index_in_book": 1,
+                "chapter_start_index": 1,
+                "chapter_end_index": 1,
+                "text": "失败重试残留。",
+                "char_count": 7,
+                "split_reason": "length_limit",
+                "is_cross_chapter": False,
+            }],
+        )
+        repository.clear_unactivated_scenes(book_id, 2)
+        assert repository.list_scenes(book_id, 2) == []
+
         repository.update_scene(
             scene_ids[0],
             summary="摘要",

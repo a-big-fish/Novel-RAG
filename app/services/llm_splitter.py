@@ -92,7 +92,16 @@ class LLMSceneSplitter:
             or any(index < 2 or index > len(window) for index in boundaries)
         ):
             raise ValueError("LLM returned invalid scene boundary indices")
-        return sorted(boundaries)
+        minimum = min(self.settings.scene_min_chars, max(1, (self.settings.max_llm_input_chars - 500) // 2))
+        accepted: list[int] = []
+        start = 1
+        for index in sorted(boundaries):
+            left = normalized_char_count("".join(window[start - 1 : index - 1]))
+            right = normalized_char_count("".join(window[index - 1 :]))
+            if left >= minimum and right >= minimum:
+                accepted.append(index)
+                start = index
+        return accepted
 
     def split(self, chapters: list[ChapterSlice]) -> list[SceneDraft]:
         budget = self.settings.max_llm_input_chars - 500

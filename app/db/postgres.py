@@ -263,6 +263,24 @@ class PostgresRepository:
     # ------------------------------------------------------------------
     # Scenes
     # ------------------------------------------------------------------
+    def clear_unactivated_scenes(self, book_id: int, version: int) -> None:
+        """Remove a failed attempt before retrying the same inactive version."""
+        predicate = (
+            (scenes.c.book_id == book_id)
+            & (scenes.c.version == version)
+        )
+        with self.engine.begin() as connection:
+            active_count = connection.execute(
+                select(func.count()).select_from(scenes).where(
+                    predicate, scenes.c.is_active.is_(True),
+                )
+            ).scalar_one()
+            if active_count:
+                raise StorageError(
+                    f"refusing to clear active scenes: book={book_id}, version={version}"
+                )
+            connection.execute(delete(scenes).where(predicate))
+
     def upsert_scenes(
         self,
         book_id: int,

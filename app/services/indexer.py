@@ -221,6 +221,7 @@ class Indexer:
 
         # A retry may reuse the same version after a partial failure. Recreate
         # the version collection so stale points can never survive the retry.
+        self.repository.clear_unactivated_scenes(book_id, version)
         self.qdrant.create_scenes_collection(book_id, version, recreate=True)
         scene_ids = self.repository.upsert_scenes(
             book_id,

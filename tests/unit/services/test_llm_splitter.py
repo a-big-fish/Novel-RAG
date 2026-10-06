@@ -44,7 +44,9 @@ def test_llm_boundaries_and_length_cap_preserve_all_text() -> None:
     llm = FakeBoundaryLLM([2])
     progress: list[tuple[int, int]] = []
     splitter = LLMSceneSplitter(
-        llm, settings=Settings(_env_file=None, max_llm_input_chars=1500),
+        llm, settings=Settings(
+            _env_file=None, max_llm_input_chars=1500, scene_min_chars=200,
+        ),
         progress=lambda done, total: progress.append((done, total)),
     )
 
@@ -149,3 +151,16 @@ def test_independent_windows_run_concurrently_and_keep_book_order() -> None:
 
     assert llm.call_count == 6
     assert "\n\n".join(scene.text for scene in scenes) == "\n\n".join(paragraphs)
+
+
+def test_dense_llm_boundaries_are_filtered_to_complete_scenes() -> None:
+    llm = FakeBoundaryLLM([2, 3, 4, 5, 6, 7, 8])
+    splitter = LLMSceneSplitter(
+        llm,
+        settings=Settings(
+            _env_file=None, max_llm_input_chars=3600, scene_min_chars=1500,
+        ),
+    )
+    window = ["字" * 380 for _ in range(8)]
+
+    assert splitter._judge_window(window) == [5]
