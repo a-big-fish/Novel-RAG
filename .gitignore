@@ -19,6 +19,7 @@ data/books/*
 !data/books/.gitkeep
 data/converted/*
 !data/converted/.gitkeep
+data/logs/
 app/data/tag_vocab/*
 !app/data/tag_vocab/.gitkeep
 !app/data/tag_vocab/*.json
