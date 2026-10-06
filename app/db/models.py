@@ -41,6 +41,7 @@ books = Table(
     Column("total_scenes", Integer, nullable=False, server_default="0"),
     Column("selected_scenes", Integer, nullable=False, server_default="0"),
     Column("archived_scenes", Integer, nullable=False, server_default="0"),
+    Column("discarded_scenes", Integer, nullable=False, server_default="0"),
     Column(
         "evaluation_failed_scenes",
         Integer,
@@ -83,6 +84,10 @@ scenes = Table(
     Column("char_count", Integer, nullable=False),
     Column("split_reason", Text, nullable=False, server_default="rule"),
     Column("is_cross_chapter", Boolean, nullable=False, server_default="false"),
+    Column("quality_screen_status", Text, nullable=False, server_default="not_run"),
+    Column("quality_screen_reason", Text, nullable=False, server_default=""),
+    Column("quality_screen_prompt_version", Text, nullable=False, server_default=""),
+    Column("quality_screen_meta_json", JSONB, nullable=False, server_default="{}"),
     Column(
         "reference_status",
         Text,
@@ -195,6 +200,18 @@ reference_evaluation_cache = Table(
     Column("model", Text, nullable=False),
     Column("prompt_version", Text, nullable=False),
     Column("rule_version", Text, nullable=False),
+    Column("input_text", Text, nullable=False),
+    Column("output_json", JSONB, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+
+scene_quality_cache = Table(
+    "scene_quality_cache",
+    metadata,
+    Column("input_hash", Text, primary_key=True),
+    Column("model", Text, nullable=False),
+    Column("prompt_version", Text, nullable=False),
     Column("input_text", Text, nullable=False),
     Column("output_json", JSONB, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),

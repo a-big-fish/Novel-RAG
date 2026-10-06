@@ -14,9 +14,9 @@ class FakeRepository:
     def list_versions(self, _book_id):
         return [
             {"version": 2, "total_scenes": 2, "selected": 1,
-             "archived": 1, "evaluation_failed": 0},
+             "archived": 1, "discarded": 0, "evaluation_failed": 0},
             {"version": 1, "total_scenes": 2, "selected": 1,
-             "archived": 1, "evaluation_failed": 0},
+             "archived": 1, "discarded": 0, "evaluation_failed": 0},
         ]
 
     def list_version_scene_metrics(self, _book_id, _version):
@@ -45,8 +45,8 @@ class FakeRepository:
                 {"text_hash": "c", "reference_status": "selected"}]
 
     def list_version_scenes_page(self, _, __, *, limit, offset, reference_status):
-        assert limit == 1 and offset == 0 and reference_status == "selected"
-        return 1, [{"id": 10, "reference_status": "selected", "summary": "摘要"}]
+        assert limit == 1 and offset == 0 and reference_status in {"selected", "discarded"}
+        return 1, [{"id": 10, "reference_status": reference_status, "summary": "摘要"}]
 
 
 class FakeQdrant:
@@ -66,6 +66,8 @@ def test_observation_uses_versioned_read_only_contract():
         assert overview["tags"]["scene_type"][0]["label"] == "动作场景"
         page = client.get(base + "/scenes?limit=1&reference_status=selected").json()
         assert page["items"][0]["id"] == 10
+        discarded = client.get(base + "/scenes?limit=1&reference_status=discarded").json()
+        assert discarded["items"][0]["reference_status"] == "discarded"
         comparison = client.get(base + "/compare?other_version=1").json()
         assert comparison["new_text"] == 1
         assert comparison["reference_status_changed"] == 1

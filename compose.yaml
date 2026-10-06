@@ -77,7 +77,8 @@ services:
              python -m app.db.migrate migrations/002_tag_vocab_aliases.sql &&
              python -m app.db.migrate migrations/003_reference_evaluation.sql &&
              python -m app.db.migrate migrations/004_query_parsing_cache.sql &&
-             python -m app.db.migrate migrations/005_scene_split_cache.sql"
+             python -m app.db.migrate migrations/005_scene_split_cache.sql &&
+             python -m app.db.migrate migrations/006_scene_quality_screen.sql"
 
   app:
     build: .

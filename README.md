@@ -27,12 +27,12 @@
 | --- | --- |
 | 导入 | Dashboard 上传 EPUB、UTF-8 TXT、UTF-8 MD；登记后选择“小说”启动索引。个人摘抄入口尚未实现。 |
 | 拆解 | EPUB 按阅读顺序提取正文并保留章节边界；LLM 粗读有界段落窗口后切分 Scene，保留全部原文。 |
-| 判断与标注 | 先评估写作参考价值，再对入选 Scene 做深度结构化标注。 |
+| 判断与标注 | 场景切分完成后，先用全书重复证据与 LLM 筛除垃圾、近重复片段，再评估写作参考价值；仅对入选 Scene 做深度结构化标注。 |
 | 索引 | PostgreSQL 保存全部场景与标注；Qdrant 为入选场景保存三路稠密向量及一路稀疏向量。 |
 | 检索 | 自然语言需求解析、四路召回、书内无权重 RRF、多书并发聚合、可选 Ollama 重排。 |
 | 观察 | Dashboard 展示导入与检索阶段、耗时、错误、解析 JSON、候选排序和完整 Scene 回查。 |
 
-`archived` Scene 仍保存在 PostgreSQL，表示它当前未被选为写作范本，不表示解析失败。多书检索只做一次查询解析与向量化，再并发检索各书；全局重排失败时保留聚合结果。个人素材库、写作质量标注与上下文组装仍在规划中。
+`archived` 表示有效场景未入选写作范本；`discarded` 表示质量全筛剔除的垃圾或近重复片段。两者的原文都保存在 PostgreSQL，均不进入 Qdrant。多书检索只做一次查询解析与向量化，再并发检索各书；全局重排失败时保留聚合结果。个人素材库、写作质量标注与上下文组装仍在规划中。
 
 ## 界面预览
 
@@ -119,12 +119,15 @@ uv run python -m app.db.migrate migrations/002_tag_vocab_aliases.sql
 uv run python -m app.db.migrate migrations/003_reference_evaluation.sql
 uv run python -m app.db.migrate migrations/004_query_parsing_cache.sql
 uv run python -m app.db.migrate migrations/005_scene_split_cache.sql
+uv run python -m app.db.migrate migrations/006_scene_quality_screen.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 `POSTGRES_DB` 指向需要初始化的数据库。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
 
 场景边界判断会按模型、提示词版本与输入内容缓存到 PostgreSQL；长篇索引中断后可复用已完成窗口。`SCENE_MIN_CHARS` 控制接受模型边界的最小场景长度。升级旧版本后，已有书籍需重新索引才能采用新的 EPUB 章节与场景切分结果。
+
+质量全筛在全部场景切分后运行，逐场景调用 LLM，并提供全书重复段落比例和最相近场景节选；极端重复的片段还会被明确规则兜底拦截。剔除的原文仍留在 PostgreSQL，以 `discarded` 独立计数，原因可在 Dashboard 中查看，不进入标注和 Qdrant；旧版本不会自动补筛，需重新索引。
 
 ## 三本书测试库
 

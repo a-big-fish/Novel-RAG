@@ -16,6 +16,7 @@ from app.services.annotator import Annotator
 from app.services.embedder import Embedder
 from app.services.llm_splitter import LLMSceneSplitter
 from app.services.reference_evaluator import ReferenceEvaluator
+from app.services.scene_quality import SceneQualityScreener
 from app.services.sparse import build_sparse_vector, collect_doc_frequencies
 from app.services.tagger import TagVocabulary
 from app.utils.epub import CONVERTER_VERSION, convert_with_cache, sha256_file
@@ -236,6 +237,10 @@ class Indexer:
                     "char_count": scene.char_count,
                     "split_reason": scene.split_reason,
                     "is_cross_chapter": scene.is_cross_chapter,
+                    "quality_screen_status": "pending",
+                    "quality_screen_reason": "",
+                    "quality_screen_prompt_version": "",
+                    "quality_screen_meta_json": {},
                     "reference_status": "unevaluated",
                     "reference_score": 0.0,
                     "reference_reason": "",
@@ -400,6 +405,18 @@ class Indexer:
                 progress_operation=True,
             )
 
+            self.repository.update_book(book_id, status="screening")
+            screener = SceneQualityScreener(
+                repository=self.repository,
+                llm_client=self.llm_client,
+                settings=self.settings,
+            )
+            screening_stats = self._run_job(
+                book_id,
+                "screen",
+                lambda: screener.screen_book(book_id, version),
+                total_items=len(scene_rows),
+            )
             self.repository.update_book(book_id, status="evaluating")
             evaluator = ReferenceEvaluator(
                 repository=self.repository,
@@ -412,10 +429,12 @@ class Indexer:
                 lambda: evaluator.evaluate_book(book_id, version),
                 total_items=len(scene_rows),
             )
+            evaluation_stats["total"] += screening_stats["rejected"]
             self.repository.update_book(
                 book_id,
                 selected_scenes=evaluation_stats["selected"],
                 archived_scenes=evaluation_stats["archived"],
+                discarded_scenes=screening_stats["rejected"],
                 evaluation_failed_scenes=evaluation_stats["evaluation_failed"],
             )
             if evaluation_stats["evaluation_failed"]:
@@ -493,11 +512,13 @@ class Indexer:
                 "scenes": len(all_scene_rows),
                 "selected_scenes": evaluation_stats["selected"],
                 "archived_scenes": evaluation_stats["archived"],
+                "discarded_scenes": screening_stats["rejected"],
                 "evaluation_failed_scenes": evaluation_stats[
                     "evaluation_failed"
                 ],
                 "indexed_scenes": indexed_selected_count,
                 "reference_evaluation": evaluation_stats,
+                "quality_screen": screening_stats,
                 "annotation": annotation_stats,
             }
         except Exception as exc:

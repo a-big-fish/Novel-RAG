@@ -12,7 +12,7 @@ CREATE TABLE scenes (
     reference_status     TEXT    NOT NULL DEFAULT 'unevaluated'
                          CHECK (reference_status IN (
                              'unevaluated', 'evaluating', 'selected',
-                             'archived', 'evaluation_failed'
+                             'archived', 'discarded', 'evaluation_failed'
                          )),
     reference_score      REAL    NOT NULL DEFAULT 0,
     reference_reason     TEXT    NOT NULL DEFAULT '',

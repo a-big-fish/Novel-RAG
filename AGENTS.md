@@ -13,6 +13,9 @@ uv sync
 uv run python -m app.db.migrate migrations/001_init.sql
 uv run python -m app.db.migrate migrations/002_tag_vocab_aliases.sql
 uv run python -m app.db.migrate migrations/003_reference_evaluation.sql
+uv run python -m app.db.migrate migrations/004_query_parsing_cache.sql
+uv run python -m app.db.migrate migrations/005_scene_split_cache.sql
+uv run python -m app.db.migrate migrations/006_scene_quality_screen.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 uv run pytest tests/unit -q
 uv run pytest tests/integration -q -m integration
