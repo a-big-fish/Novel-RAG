@@ -77,14 +77,15 @@ def test_oversized_paragraph_is_bounded_without_losing_characters() -> None:
     assert all(scene.char_count <= 1000 for scene in scenes)
 
 
-def test_invalid_llm_boundary_fails_instead_of_silently_corrupting_scenes() -> None:
-    llm = FakeBoundaryLLM([99])
+def test_invalid_llm_boundary_is_ignored_without_losing_text() -> None:
+    llm = FakeBoundaryLLM([99, 2, 2])
     splitter = LLMSceneSplitter(
         llm, settings=Settings(_env_file=None, max_llm_input_chars=1500),
     )
 
-    with pytest.raises(ValueError, match="invalid scene boundary"):
-        splitter.split([_chapter("第一段。\n\n第二段。")])
+    scenes = splitter.split([_chapter("第一段。\n\n第二段。")])
+
+    assert "\n\n".join(scene.text for scene in scenes) == "第一段。\n\n第二段。"
 
 
 def test_many_short_paragraphs_keep_prompt_bounded() -> None:

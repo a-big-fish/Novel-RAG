@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
 from typing import Callable
@@ -14,6 +15,7 @@ from app.services.splitter import SceneDraft
 from app.utils.text import ChapterSlice, normalized_char_count, split_paragraphs
 
 _SENTENCE_END_RE = re.compile(r"[。！？；.!?;]")
+logger = logging.getLogger(__name__)
 
 
 class SceneBoundaryDecision(BaseModel):
@@ -87,15 +89,23 @@ class LLMSceneSplitter:
             response_model=SceneBoundaryDecision,
         )
         boundaries = decision.boundaries
-        if (
-            len(set(boundaries)) != len(boundaries)
-            or any(index < 2 or index > len(window) for index in boundaries)
-        ):
-            raise ValueError("LLM returned invalid scene boundary indices")
+        valid_boundaries = sorted({
+            index for index in boundaries if 2 <= index <= len(window)
+        })
+        if len(valid_boundaries) != len(boundaries):
+            logger.warning(
+                "ignored invalid LLM scene boundary indices",
+                extra={
+                    "paragraph_count": len(window),
+                    "proposed_count": len(boundaries),
+                    "valid_count": len(valid_boundaries),
+                    "model": self.llm_client.model,
+                },
+            )
         minimum = min(self.settings.scene_min_chars, max(1, (self.settings.max_llm_input_chars - 500) // 2))
         accepted: list[int] = []
         start = 1
-        for index in sorted(boundaries):
+        for index in valid_boundaries:
             left = normalized_char_count("".join(window[start - 1 : index - 1]))
             right = normalized_char_count("".join(window[index - 1 :]))
             if left >= minimum and right >= minimum:

@@ -200,7 +200,7 @@ def test_failed_llm_split_does_not_replace_existing_chapters(tmp_path: Path) -> 
         model = "invalid-boundary-model"
 
         def request_typed(self, **_kwargs: Any) -> SceneBoundaryDecision:
-            return SceneBoundaryDecision(boundaries=[99])
+            raise RuntimeError("LLM unavailable")
 
     source = tmp_path / "book.txt"
     source.write_text("第一章\n\n第一段。\n\n第二段。", encoding="utf-8")
@@ -208,7 +208,7 @@ def test_failed_llm_split_does_not_replace_existing_chapters(tmp_path: Path) -> 
     indexer = _indexer(repository, Settings(_env_file=None))
     indexer.llm_client = InvalidBoundaryClient()  # type: ignore[assignment]
 
-    with pytest.raises(ValueError, match="invalid scene boundary"):
+    with pytest.raises(RuntimeError, match="LLM unavailable"):
         indexer._split_and_store(1, 2, source)
 
     assert repository.chapters_replaced is False
