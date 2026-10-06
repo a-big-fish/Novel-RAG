@@ -7,6 +7,7 @@ import pytest
 
 from app.config import Settings
 from app.services.indexer import Indexer
+from app.services.llm_splitter import SceneBoundaryDecision
 from app.services.tagger import TagVocabulary
 from app.utils.epub import sha256_file
 from app.utils.errors import NovelRagError
@@ -153,3 +154,28 @@ def test_close_releases_owned_clients() -> None:
     assert qdrant.closed is True
     assert llm.closed is True
     assert ollama.closed is True
+
+
+def test_failed_llm_split_does_not_replace_existing_chapters(tmp_path: Path) -> None:
+    class TrackingRepository(FakeRepository):
+        chapters_replaced = False
+
+        def replace_chapters(self, *_args: Any, **_kwargs: Any) -> None:
+            self.chapters_replaced = True
+
+    class InvalidBoundaryClient:
+        model = "invalid-boundary-model"
+
+        def request_typed(self, **_kwargs: Any) -> SceneBoundaryDecision:
+            return SceneBoundaryDecision(boundaries=[99])
+
+    source = tmp_path / "book.txt"
+    source.write_text("第一章\n\n第一段。\n\n第二段。", encoding="utf-8")
+    repository = TrackingRepository()
+    indexer = _indexer(repository, Settings(_env_file=None))
+    indexer.llm_client = InvalidBoundaryClient()  # type: ignore[assignment]
+
+    with pytest.raises(ValueError, match="invalid scene boundary"):
+        indexer._split_and_store(1, 2, source)
+
+    assert repository.chapters_replaced is False

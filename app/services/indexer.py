@@ -175,6 +175,15 @@ class Indexer:
         if not chapter_drafts:
             raise NovelRagError("book contains no readable chapters")
 
+        scene_drafts = LLMSceneSplitter(
+            self.llm_client, settings=self.settings,
+        ).split(chapter_drafts)
+        if not scene_drafts:
+            raise NovelRagError("book contains no readable scenes")
+
+        # LLM splitting can fail. Keep the previous chapters until all scene
+        # boundaries have been validated, so a failed request does not replace
+        # the active book's chapter text with an incomplete new version.
         self.repository.replace_chapters(
             book_id,
             [
@@ -189,11 +198,6 @@ class Indexer:
                 for chapter in chapter_drafts
             ],
         )
-        scene_drafts = LLMSceneSplitter(
-            self.llm_client, settings=self.settings,
-        ).split(chapter_drafts)
-        if not scene_drafts:
-            raise NovelRagError("book contains no readable scenes")
 
         # A retry may reuse the same version after a partial failure. Recreate
         # the version collection so stale points can never survive the retry.
