@@ -95,17 +95,30 @@ class Indexer:
         self,
         book_id: int,
         stage: str,
-        operation: Callable[[], Any],
+        operation: Callable[..., Any],
         *,
         total_items: int = 0,
+        progress_operation: bool = False,
     ) -> Any:
         job_id = self.repository.create_job(
             book_id,
             stage,
             total_items=total_items,
         )
+        progress_done = 0
+        progress_total = 0
+
+        def report_progress(done: int, total: int) -> None:
+            nonlocal progress_done, progress_total
+            progress_done, progress_total = done, total
+            self.repository.update_job(
+                job_id, done_items=done, total_items=total,
+            )
+
         try:
-            result = operation()
+            result = (
+                operation(report_progress) if progress_operation else operation()
+            )
         except Exception as exc:
             self.repository.update_job(
                 job_id,
@@ -119,10 +132,16 @@ class Indexer:
             else len(result) if isinstance(result, list)
             else total_items
         )
+        if progress_operation and progress_total:
+            done_items = progress_done
         self.repository.update_job(
             job_id,
             status="completed",
-            total_items=done_items if isinstance(result, list) and not total_items else None,
+            total_items=(
+                progress_total if progress_operation and progress_total
+                else done_items if isinstance(result, list) and not total_items
+                else None
+            ),
             done_items=done_items,
             finished=True,
         )
@@ -169,6 +188,7 @@ class Indexer:
         book_id: int,
         version: int,
         txt_path: Path,
+        progress: Callable[[int, int], None] | None = None,
     ) -> list[dict[str, Any]]:
         text = txt_path.read_text(encoding="utf-8")
         chapter_drafts = split_chapters(text)
@@ -176,7 +196,7 @@ class Indexer:
             raise NovelRagError("book contains no readable chapters")
 
         scene_drafts = LLMSceneSplitter(
-            self.llm_client, settings=self.settings,
+            self.llm_client, settings=self.settings, progress=progress,
         ).split(chapter_drafts)
         if not scene_drafts:
             raise NovelRagError("book contains no readable scenes")
@@ -372,7 +392,10 @@ class Indexer:
             scene_rows = self._run_job(
                 book_id,
                 "split",
-                lambda: self._split_and_store(book_id, version, txt_path),
+                lambda progress: self._split_and_store(
+                    book_id, version, txt_path, progress,
+                ),
+                progress_operation=True,
             )
 
             self.repository.update_book(book_id, status="evaluating")

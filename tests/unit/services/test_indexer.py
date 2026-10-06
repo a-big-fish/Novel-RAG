@@ -142,6 +142,39 @@ def test_list_stage_records_item_count_for_dashboard() -> None:
     assert repository.job_update["total_items"] == 2
 
 
+def test_split_stage_reports_window_progress() -> None:
+    class JobRepository(FakeRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.updates: list[dict[str, Any]] = []
+
+        def create_job(self, *_args: Any, **_kwargs: Any) -> int:
+            return 31
+
+        def update_job(self, job_id: int, **values: Any) -> None:
+            assert job_id == 31
+            self.updates.append(values)
+
+    repository = JobRepository()
+    indexer = _indexer(repository, Settings(_env_file=None))
+
+    def split_operation(report: Any) -> list[int]:
+        report(0, 3)
+        report(1, 3)
+        report(3, 3)
+        return [1, 2]
+
+    result = indexer._run_job(
+        1, "split", split_operation,
+        progress_operation=True,
+    )
+
+    assert result == [1, 2]
+    assert repository.updates[-1]["status"] == "completed"
+    assert repository.updates[-1]["done_items"] == 3
+    assert repository.updates[-1]["total_items"] == 3
+
+
 def test_close_releases_owned_clients() -> None:
     repository = FakeRepository()
     indexer = _indexer(repository, Settings(_env_file=None))

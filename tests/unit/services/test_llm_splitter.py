@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 import pytest
@@ -41,13 +42,17 @@ def test_llm_boundaries_and_length_cap_preserve_all_text() -> None:
     paragraphs = [f"段落{i}。" + "内容" * 190 for i in range(1, 9)]
     text = "\n\n".join(paragraphs)
     llm = FakeBoundaryLLM([2])
+    progress: list[tuple[int, int]] = []
     splitter = LLMSceneSplitter(
         llm, settings=Settings(_env_file=None, max_llm_input_chars=1500),
+        progress=lambda done, total: progress.append((done, total)),
     )
 
     scenes = splitter.split([_chapter(text)])
 
     assert len(llm.calls) == 4
+    assert progress[0] == (0, 4)
+    assert progress[-1] == (4, 4)
     assert len(scenes) == 8
     assert scenes[0].split_reason == "chapter_start"
     assert scenes[1].split_reason == "llm_boundary"
@@ -113,3 +118,34 @@ def test_llm_can_merge_continuous_scene_across_short_chapters() -> None:
     assert scenes[0].chapter_end_index == 2
     assert scenes[0].is_cross_chapter is True
     assert scenes[0].split_reason == "llm_cross_chapter_merge"
+
+
+def test_independent_windows_run_concurrently_and_keep_book_order() -> None:
+    class ConcurrentLLM(FakeBoundaryLLM):
+        def __init__(self) -> None:
+            super().__init__([])
+            self.first_wave = threading.Barrier(3, timeout=5)
+            self.lock = threading.Lock()
+            self.call_count = 0
+
+        def request_typed(self, **kwargs: Any) -> SceneBoundaryDecision:
+            with self.lock:
+                self.call_count += 1
+                call_number = self.call_count
+            if call_number <= 3:
+                self.first_wave.wait()
+            return SceneBoundaryDecision(boundaries=[])
+
+    paragraphs = [f"段落{i}。" + "字" * 375 for i in range(1, 13)]
+    llm = ConcurrentLLM()
+    splitter = LLMSceneSplitter(
+        llm,
+        settings=Settings(
+            _env_file=None, max_llm_input_chars=1500, llm_concurrency=3,
+        ),
+    )
+
+    scenes = splitter.split([_chapter("\n\n".join(paragraphs))])
+
+    assert llm.call_count == 6
+    assert "\n\n".join(scene.text for scene in scenes) == "\n\n".join(paragraphs)

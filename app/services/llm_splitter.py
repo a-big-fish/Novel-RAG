@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
+from typing import Callable
 
 from pydantic import BaseModel, Field
 
@@ -47,43 +49,83 @@ class LLMSceneSplitter:
         llm_client: JsonLLMClient,
         *,
         settings: Settings | None = None,
+        progress: Callable[[int, int], None] | None = None,
     ) -> None:
         self.llm_client = llm_client
         self.settings = settings or get_settings()
+        self.progress = progress
+
+    @staticmethod
+    def _windows(chapter: ChapterSlice, budget: int) -> list[list[str]]:
+        paragraphs = [
+            part
+            for paragraph in split_paragraphs(chapter.text)
+            for part in _split_long_paragraph(paragraph, budget - 20)
+        ]
+        windows: list[list[str]] = []
+        window: list[str] = []
+        window_chars = 0
+        for paragraph in paragraphs:
+            added = len(paragraph) + len(f"[{len(window) + 1}] ") + 1
+            if window and window_chars + added > budget:
+                windows.append(window)
+                window = []
+                window_chars = 0
+                added = len(paragraph) + len("[1] ") + 1
+            window.append(paragraph)
+            window_chars += added
+        if window:
+            windows.append(window)
+        return windows
+
+    def _judge_window(self, window: list[str]) -> list[int]:
+        if len(window) == 1:
+            return []
+        decision = self.llm_client.request_typed(
+            system_prompt=scene_prompt.SYSTEM_PROMPT,
+            user_prompt=scene_prompt.build_user_prompt(window),
+            response_model=SceneBoundaryDecision,
+        )
+        boundaries = decision.boundaries
+        if (
+            len(set(boundaries)) != len(boundaries)
+            or any(index < 2 or index > len(window) for index in boundaries)
+        ):
+            raise ValueError("LLM returned invalid scene boundary indices")
+        return sorted(boundaries)
 
     def split(self, chapters: list[ChapterSlice]) -> list[SceneDraft]:
         budget = self.settings.max_llm_input_chars - 500
         if budget < 500:
             raise ValueError("MAX_LLM_INPUT_CHARS must be at least 1000 for scene splitting")
-        scenes: list[SceneDraft] = []
-        for chapter in chapters:
-            chapter_first_scene = len(scenes)
-            paragraphs = [
-                part
-                for paragraph in split_paragraphs(chapter.text)
-                for part in _split_long_paragraph(paragraph, budget - 20)
-            ]
-            window: list[str] = []
-            window_chars = 0
-            first_window = True
+        chapter_windows = [self._windows(chapter, budget) for chapter in chapters]
+        decisions: dict[tuple[int, int], list[int]] = {}
+        total = sum(map(len, chapter_windows))
+        if total:
+            if self.progress is not None:
+                self.progress(0, total)
+            workers = max(1, min(self.settings.llm_concurrency, total))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(self._judge_window, window): (chapter_index, window_index)
+                    for chapter_index, windows in enumerate(chapter_windows)
+                    for window_index, window in enumerate(windows)
+                }
+                for done, future in enumerate(as_completed(futures), start=1):
+                    try:
+                        decisions[futures[future]] = future.result()
+                    except Exception:
+                        for pending in futures:
+                            pending.cancel()
+                        raise
+                    if self.progress is not None:
+                        self.progress(done, total)
 
-            def flush() -> None:
-                nonlocal window, window_chars, first_window
-                if not window:
-                    return
-                boundaries = []
-                if len(window) > 1:
-                    decision = self.llm_client.request_typed(
-                        system_prompt=scene_prompt.SYSTEM_PROMPT,
-                        user_prompt=scene_prompt.build_user_prompt(window),
-                        response_model=SceneBoundaryDecision,
-                    )
-                    boundaries = decision.boundaries
-                if (
-                    len(set(boundaries)) != len(boundaries)
-                    or any(index < 2 or index > len(window) for index in boundaries)
-                ):
-                    raise ValueError("LLM returned invalid scene boundary indices")
+        scenes: list[SceneDraft] = []
+        for chapter_index, chapter in enumerate(chapters):
+            chapter_first_scene = len(scenes)
+            for window_index, window in enumerate(chapter_windows[chapter_index]):
+                boundaries = decisions[chapter_index, window_index]
                 starts = [1, *sorted(boundaries), len(window) + 1]
                 for offset, (start, end) in enumerate(zip(starts, starts[1:])):
                     scene_text = "\n\n".join(window[start - 1 : end - 1]).strip()
@@ -97,25 +139,12 @@ class LLMSceneSplitter:
                             text=scene_text,
                             char_count=normalized_char_count(scene_text),
                             split_reason=(
-                                "chapter_start" if first_window and offset == 0
+                                "chapter_start" if window_index == 0 and offset == 0
                                 else "length_limit" if offset == 0
                                 else "llm_boundary"
                             ),
                         )
                     )
-                first_window = False
-                window = []
-                window_chars = 0
-
-            for paragraph in paragraphs:
-                # Account for paragraph labels in the actual LLM prompt.
-                added = len(paragraph) + len(f"[{len(window) + 1}] ") + 1
-                if window and window_chars + added > budget:
-                    flush()
-                    added = len(paragraph) + len("[1] ") + 1
-                window.append(paragraph)
-                window_chars += added
-            flush()
             if chapter_first_scene and len(scenes) > chapter_first_scene:
                 previous = scenes[chapter_first_scene - 1]
                 following = scenes[chapter_first_scene]
