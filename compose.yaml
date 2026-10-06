@@ -1,0 +1,104 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-novel_rag}
+      POSTGRES_USER: ${POSTGRES_USER:-rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.19.1
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "127.0.0.1:6333:6333"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:0.35.1
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    restart: unless-stopped
+
+  ollama-init:
+    image: ollama/ollama:0.35.1
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      ollama pull '${OLLAMA_EMBED_MODEL:-bge-m3}' &&
+      if [ "$$RERANK_ENABLED" = "true" ]; then
+        ollama pull '${OLLAMA_RERANK_MODEL:-awenleven/Qwen3-Reranker-4B:Q4_K_M}';
+      fi
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      RERANK_ENABLED: ${RERANK_ENABLED:-false}
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  migrate:
+    build: .
+    env_file: .env
+    environment: &app_environment
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-novel_rag}
+      POSTGRES_USER: ${POSTGRES_USER:-rag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_URL: http://ollama:11434
+      BOOK_SOURCE_DIR: /app/data/books
+      ALLOWED_SOURCE_ROOTS: /app/data/books
+      DATA_BOOKS_DIR: /app/data/books
+      DATA_CONVERTED_DIR: /app/data/converted
+    volumes:
+      - ./data/books:/app/data/books
+      - ./data/converted:/app/data/converted
+      - ./.env:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >-
+      sh -c "python -m app.db.migrate migrations/001_init.sql &&
+             python -m app.db.migrate migrations/002_tag_vocab_aliases.sql &&
+             python -m app.db.migrate migrations/003_reference_evaluation.sql &&
+             python -m app.db.migrate migrations/004_query_parsing_cache.sql"
+
+  app:
+    build: .
+    env_file: .env
+    environment: *app_environment
+    volumes:
+      - ./data/books:/app/data/books
+      - ./data/converted:/app/data/converted
+      - ./.env:/app/.env:ro
+      - ./sql/fixtures:/app/sql/fixtures:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      qdrant:
+        condition: service_started
+      ollama-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  qdrant_data:
+  ollama_data:
