@@ -214,6 +214,18 @@ query_parsing_cache = Table(
 )
 
 
+scene_split_cache = Table(
+    "scene_split_cache",
+    metadata,
+    Column("input_hash", Text, primary_key=True),
+    Column("model", Text, nullable=False),
+    Column("prompt_version", Text, nullable=False),
+    Column("input_text", Text, nullable=False),
+    Column("output_json", JSONB, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)
+
+
 embedding_cache = Table(
     "embedding_cache",
     metadata,

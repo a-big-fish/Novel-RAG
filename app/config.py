@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     long_text_middle_chars: int = 1200
     long_text_tail_chars: int = 1200
     max_llm_input_chars: int = 3600
+    scene_min_chars: int = Field(default=1200, ge=1)
     max_embed_input_chars: int = 3600
     llm_concurrency: int = 10
     embed_concurrency: int = 3

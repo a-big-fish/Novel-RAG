@@ -7,6 +7,7 @@ import pytest
 
 from app.config import Settings
 from app.services.indexer import Indexer
+from app.services.llm_splitter import SceneBoundaryDecision
 from app.services.tagger import TagVocabulary
 from app.utils.epub import sha256_file
 from app.utils.errors import NovelRagError
@@ -15,6 +16,15 @@ from app.utils.errors import NovelRagError
 class FakeRepository:
     def __init__(self) -> None:
         self.embedding_cache_written = False
+
+    def scene_split_cache_key(self, **_kwargs: Any) -> str:
+        return "split-test-key"
+
+    def get_scene_split_cache(self, _input_hash: str) -> None:
+        return None
+
+    def put_scene_split_cache(self, **_kwargs: Any) -> None:
+        return None
 
     def sync_token_map(
         self,
@@ -141,6 +151,39 @@ def test_list_stage_records_item_count_for_dashboard() -> None:
     assert repository.job_update["total_items"] == 2
 
 
+def test_split_stage_reports_window_progress() -> None:
+    class JobRepository(FakeRepository):
+        def __init__(self) -> None:
+            super().__init__()
+            self.updates: list[dict[str, Any]] = []
+
+        def create_job(self, *_args: Any, **_kwargs: Any) -> int:
+            return 31
+
+        def update_job(self, job_id: int, **values: Any) -> None:
+            assert job_id == 31
+            self.updates.append(values)
+
+    repository = JobRepository()
+    indexer = _indexer(repository, Settings(_env_file=None))
+
+    def split_operation(report: Any) -> list[int]:
+        report(0, 3)
+        report(1, 3)
+        report(3, 3)
+        return [1, 2]
+
+    result = indexer._run_job(
+        1, "split", split_operation,
+        progress_operation=True,
+    )
+
+    assert result == [1, 2]
+    assert repository.updates[-1]["status"] == "completed"
+    assert repository.updates[-1]["done_items"] == 3
+    assert repository.updates[-1]["total_items"] == 3
+
+
 def test_close_releases_owned_clients() -> None:
     repository = FakeRepository()
     indexer = _indexer(repository, Settings(_env_file=None))
@@ -153,3 +196,28 @@ def test_close_releases_owned_clients() -> None:
     assert qdrant.closed is True
     assert llm.closed is True
     assert ollama.closed is True
+
+
+def test_failed_llm_split_does_not_replace_existing_chapters(tmp_path: Path) -> None:
+    class TrackingRepository(FakeRepository):
+        chapters_replaced = False
+
+        def replace_chapters(self, *_args: Any, **_kwargs: Any) -> None:
+            self.chapters_replaced = True
+
+    class InvalidBoundaryClient:
+        model = "invalid-boundary-model"
+
+        def request_typed(self, **_kwargs: Any) -> SceneBoundaryDecision:
+            raise RuntimeError("LLM unavailable")
+
+    source = tmp_path / "book.txt"
+    source.write_text("第一章\n\n第一段。\n\n第二段。", encoding="utf-8")
+    repository = TrackingRepository()
+    indexer = _indexer(repository, Settings(_env_file=None))
+    indexer.llm_client = InvalidBoundaryClient()  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError, match="LLM unavailable"):
+        indexer._split_and_store(1, 2, source)
+
+    assert repository.chapters_replaced is False

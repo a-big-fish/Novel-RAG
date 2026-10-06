@@ -18,6 +18,7 @@ from app.db.models import (
     embedding_cache,
     index_jobs,
     query_parsing_cache,
+    scene_split_cache,
     reference_evaluation_cache,
     scenes,
     tag_vocab,
@@ -263,6 +264,24 @@ class PostgresRepository:
     # ------------------------------------------------------------------
     # Scenes
     # ------------------------------------------------------------------
+    def clear_unactivated_scenes(self, book_id: int, version: int) -> None:
+        """Remove a failed attempt before retrying the same inactive version."""
+        predicate = (
+            (scenes.c.book_id == book_id)
+            & (scenes.c.version == version)
+        )
+        with self.engine.begin() as connection:
+            active_count = connection.execute(
+                select(func.count()).select_from(scenes).where(
+                    predicate, scenes.c.is_active.is_(True),
+                )
+            ).scalar_one()
+            if active_count:
+                raise StorageError(
+                    f"refusing to clear active scenes: book={book_id}, version={version}"
+                )
+            connection.execute(delete(scenes).where(predicate))
+
     def upsert_scenes(
         self,
         book_id: int,
@@ -415,6 +434,44 @@ class PostgresRepository:
     # ------------------------------------------------------------------
     # Caches
     # ------------------------------------------------------------------
+    @staticmethod
+    def scene_split_cache_key(
+        *, model: str, prompt_version: str, input_text: str,
+    ) -> str:
+        payload = "\x1f".join((model, prompt_version, input_text))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def get_scene_split_cache(self, input_hash: str) -> Mapping[str, Any] | None:
+        with self.engine.connect() as connection:
+            return connection.execute(
+                select(scene_split_cache).where(
+                    scene_split_cache.c.input_hash == input_hash
+                )
+            ).mappings().first()
+
+    def put_scene_split_cache(
+        self,
+        *,
+        input_hash: str,
+        model: str,
+        prompt_version: str,
+        input_text: str,
+        output_json: Mapping[str, Any],
+    ) -> None:
+        statement = (
+            pg_insert(scene_split_cache)
+            .values(
+                input_hash=input_hash,
+                model=model,
+                prompt_version=prompt_version,
+                input_text=input_text,
+                output_json=dict(output_json),
+            )
+            .on_conflict_do_nothing(index_elements=[scene_split_cache.c.input_hash])
+        )
+        with self.engine.begin() as connection:
+            connection.execute(statement)
+
     @staticmethod
     def reference_evaluation_cache_key(
         *,

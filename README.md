@@ -26,7 +26,7 @@
 | 环节 | 已实现内容 |
 | --- | --- |
 | 导入 | Dashboard 上传 EPUB、UTF-8 TXT、UTF-8 MD；登记后选择“小说”启动索引。个人摘抄入口尚未实现。 |
-| 拆解 | EPUB 转文本，章节与 Scene 切分；保留全部原文 Scene。 |
+| 拆解 | EPUB 按阅读顺序提取正文并保留章节边界；LLM 粗读有界段落窗口后切分 Scene，保留全部原文。 |
 | 判断与标注 | 先评估写作参考价值，再对入选 Scene 做深度结构化标注。 |
 | 索引 | PostgreSQL 保存全部场景与标注；Qdrant 为入选场景保存三路稠密向量及一路稀疏向量。 |
 | 检索 | 自然语言需求解析、四路召回、书内无权重 RRF、多书并发聚合、可选 Ollama 重排。 |
@@ -116,10 +116,13 @@ uv run python -m app.db.migrate migrations/001_init.sql
 uv run python -m app.db.migrate migrations/002_tag_vocab_aliases.sql
 uv run python -m app.db.migrate migrations/003_reference_evaluation.sql
 uv run python -m app.db.migrate migrations/004_query_parsing_cache.sql
+uv run python -m app.db.migrate migrations/005_scene_split_cache.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 `POSTGRES_DB` 指向需要初始化的数据库。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
+
+场景边界判断会按模型、提示词版本与输入内容缓存到 PostgreSQL；长篇索引中断后可复用已完成窗口。`SCENE_MIN_CHARS` 控制接受模型边界的最小场景长度。升级旧版本后，已有书籍需重新索引才能采用新的 EPUB 章节与场景切分结果。
 
 ## 三本书测试库
 

@@ -14,11 +14,11 @@ from app.db.postgres import PostgresRepository
 from app.db.qdrant import QdrantAdapter
 from app.services.annotator import Annotator
 from app.services.embedder import Embedder
+from app.services.llm_splitter import LLMSceneSplitter
 from app.services.reference_evaluator import ReferenceEvaluator
 from app.services.sparse import build_sparse_vector, collect_doc_frequencies
-from app.services.splitter import split_chapters_into_scenes
 from app.services.tagger import TagVocabulary
-from app.utils.epub import convert_with_cache, sha256_file
+from app.utils.epub import CONVERTER_VERSION, convert_with_cache, sha256_file
 from app.utils.errors import NovelRagError
 from app.utils.text import clean_text, split_chapters
 
@@ -95,17 +95,30 @@ class Indexer:
         self,
         book_id: int,
         stage: str,
-        operation: Callable[[], Any],
+        operation: Callable[..., Any],
         *,
         total_items: int = 0,
+        progress_operation: bool = False,
     ) -> Any:
         job_id = self.repository.create_job(
             book_id,
             stage,
             total_items=total_items,
         )
+        progress_done = 0
+        progress_total = 0
+
+        def report_progress(done: int, total: int) -> None:
+            nonlocal progress_done, progress_total
+            progress_done, progress_total = done, total
+            self.repository.update_job(
+                job_id, done_items=done, total_items=total,
+            )
+
         try:
-            result = operation()
+            result = (
+                operation(report_progress) if progress_operation else operation()
+            )
         except Exception as exc:
             self.repository.update_job(
                 job_id,
@@ -119,10 +132,16 @@ class Indexer:
             else len(result) if isinstance(result, list)
             else total_items
         )
+        if progress_operation and progress_total:
+            done_items = progress_done
         self.repository.update_job(
             job_id,
             status="completed",
-            total_items=done_items if isinstance(result, list) and not total_items else None,
+            total_items=(
+                progress_total if progress_operation and progress_total
+                else done_items if isinstance(result, list) and not total_items
+                else None
+            ),
             done_items=done_items,
             finished=True,
         )
@@ -138,7 +157,7 @@ class Indexer:
             path, _cache_hit = convert_with_cache(
                 source_path,
                 self.settings.data_converted_dir,
-                converter_version=self.settings.epub_converter_version,
+                converter_version=self._epub_converter_version(),
             )
             return path
 
@@ -159,17 +178,33 @@ class Indexer:
         _atomic_write_text(output_path, clean_text(raw))
         return output_path
 
+    def _epub_converter_version(self) -> str:
+        # Include the implementation version even when a local .env still has
+        # the previous EPUB_CONVERTER_VERSION, so stale TXT is never reused.
+        return f"{self.settings.epub_converter_version}.{CONVERTER_VERSION}"
+
     def _split_and_store(
         self,
         book_id: int,
         version: int,
         txt_path: Path,
+        progress: Callable[[int, int], None] | None = None,
     ) -> list[dict[str, Any]]:
         text = txt_path.read_text(encoding="utf-8")
         chapter_drafts = split_chapters(text)
         if not chapter_drafts:
             raise NovelRagError("book contains no readable chapters")
 
+        scene_drafts = LLMSceneSplitter(
+            self.llm_client, settings=self.settings, progress=progress,
+            repository=self.repository,
+        ).split(chapter_drafts)
+        if not scene_drafts:
+            raise NovelRagError("book contains no readable scenes")
+
+        # LLM splitting can fail. Keep the previous chapters until all scene
+        # boundaries have been validated, so a failed request does not replace
+        # the active book's chapter text with an incomplete new version.
         self.repository.replace_chapters(
             book_id,
             [
@@ -184,12 +219,10 @@ class Indexer:
                 for chapter in chapter_drafts
             ],
         )
-        scene_drafts = split_chapters_into_scenes(chapter_drafts)
-        if not scene_drafts:
-            raise NovelRagError("book contains no readable scenes")
 
         # A retry may reuse the same version after a partial failure. Recreate
         # the version collection so stale points can never survive the retry.
+        self.repository.clear_unactivated_scenes(book_id, version)
         self.qdrant.create_scenes_collection(book_id, version, recreate=True)
         scene_ids = self.repository.upsert_scenes(
             book_id,
@@ -351,7 +384,7 @@ class Indexer:
                 book_id,
                 converted_path=str(txt_path),
                 converter_version=(
-                    self.settings.epub_converter_version
+                    self._epub_converter_version()
                     if book["source_format"] == "epub"
                     else None
                 ),
@@ -361,7 +394,10 @@ class Indexer:
             scene_rows = self._run_job(
                 book_id,
                 "split",
-                lambda: self._split_and_store(book_id, version, txt_path),
+                lambda progress: self._split_and_store(
+                    book_id, version, txt_path, progress,
+                ),
+                progress_operation=True,
             )
 
             self.repository.update_book(book_id, status="evaluating")
