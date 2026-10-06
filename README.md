@@ -201,3 +201,9 @@ data/                   本地上传与转换缓存，不进入 Git
 compose.yaml            PostgreSQL、Qdrant、Ollama 与应用编排
 Dockerfile              应用镜像
 ```
+
+## 交流社区
+
+Novel-RAG QQ 群：**1107919593**。可搜索群号或扫描下方二维码加入。
+
+![Novel-RAG QQ 群二维码](images/qq-group-qr-code.jpg)
