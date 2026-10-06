@@ -41,25 +41,26 @@ class Settings(BaseSettings):
     app_version: str = "0.8.0"
     api_prefix: str = "/api/v1"
 
-    book_source_dir: Path = Path("E:/novels/tool")
-    allowed_source_roots: str = "E:/novels/tool"
+    book_source_dir: Path = Path("data/books")
+    allowed_source_roots: str = "data/books"
+    book_upload_max_bytes: int = Field(default=100 * 1024 * 1024, ge=1)
     data_books_dir: Path = Path("data/books")
     data_converted_dir: Path = Path("data/converted")
     epub_converter_version: str = "epub-v1"
 
-    postgres_host: str = "172.16.43.125"
+    postgres_host: str = "127.0.0.1"
     postgres_port: int = 5432
     postgres_db: str = "novel_rag"
-    postgres_user: str = "admin"
+    postgres_user: str = "rag"
     postgres_password: SecretStr = SecretStr("")
     postgres_test_db: str = "novel-rag-test-2"
 
-    qdrant_url: str = "http://172.16.43.125:6333"
+    qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_api_key: SecretStr | None = None
     qdrant_timeout_seconds: float = 30.0
     embedding_dimension: int = 1024
 
-    ollama_url: str = "http://172.16.43.125:11434"
+    ollama_url: str = "http://127.0.0.1:11434"
     ollama_embed_model: str = "bge-m3"
     ollama_rerank_model: str = "awenleven/Qwen3-Reranker-4B:Q4_K_M"
     ollama_timeout_seconds: float = 120.0

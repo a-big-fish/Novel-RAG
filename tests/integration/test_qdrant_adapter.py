@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from app.config import Settings
+from app.config import get_settings
 from app.db.qdrant import QdrantAdapter, scenes_collection_name
 
 pytestmark = pytest.mark.integration
@@ -27,7 +27,7 @@ def _point(point_id: int) -> dict:
 
 
 def test_qdrant_adapter_round_trip_against_configured_service() -> None:
-    settings = Settings(_env_file=None, embedding_dimension=4)
+    settings = get_settings().model_copy(update={"embedding_dimension": 4})
     adapter = QdrantAdapter(settings=settings, dimension=4)
     book_id = uuid.uuid4().int % 900_000_000 + 1
     collection_name = scenes_collection_name(book_id, 1)

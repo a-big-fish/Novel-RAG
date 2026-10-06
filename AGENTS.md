@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-`novel-rag` is a Python 3.11 FastAPI service for the novel-writing RAG ingestion pipeline. Application code lives in `app/`: `api/` for routes, `clients/` for LLM/Ollama adapters, `db/` for PostgreSQL and Qdrant, `services/` for pipeline stages, `prompts/` for versioned prompts, and `utils/` for EPUB conversion and text handling.
+`Novel-RAG` is a Python 3.11 FastAPI service for the novel-writing RAG ingestion pipeline. Application code lives in `app/`: `api/` for routes, `clients/` for LLM/Ollama adapters, `db/` for PostgreSQL and Qdrant, `services/` for pipeline stages, `prompts/` for versioned prompts, and `utils/` for EPUB conversion and text handling.
 
 Maintain all PostgreSQL and Qdrant create statements in `./sql/`, with PostgreSQL DDL at `sql/postgres/` (for example `001_init.sql`) and Qdrant collection definitions at `sql/qdrant/`. `migrations/` records applied migration history. `tests/unit/`, `tests/integration/`, and `tests/fixtures/` mirror the application domains; local generated books and converted files belong under `data/`.
 

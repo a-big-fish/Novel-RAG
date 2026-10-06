@@ -1,0 +1,54 @@
+{
+  "format": "novel-rag-public-fixture-v1",
+  "books": [
+    {
+      "id": 10,
+      "title": "马之途",
+      "version": 2,
+      "scenes": 10,
+      "selected_points": 9,
+      "collection": "scenes_book_10_v2",
+      "file": "qdrant/scenes_book_10_v2.jsonl",
+      "sha256": "5342b42541de6954c90699be00d1034e1337a523eb979bdc4ae3721ccb1b3dd9"
+    },
+    {
+      "id": 43,
+      "title": "备用联系人",
+      "version": 1,
+      "scenes": 99,
+      "selected_points": 64,
+      "collection": "scenes_book_43_v1",
+      "file": "qdrant/scenes_book_43_v1.jsonl",
+      "sha256": "2c0ca327e7816d59f4e937d134d2b09809c4f1c5bd8d6d5f868876c5bab6c83a"
+    },
+    {
+      "id": 44,
+      "title": "切勿操之过急",
+      "version": 1,
+      "scenes": 225,
+      "selected_points": 168,
+      "collection": "scenes_book_44_v1",
+      "file": "qdrant/scenes_book_44_v1.jsonl",
+      "sha256": "6d204baa99955f4ab653bc794edaca569610e562c2a01ed40ad7c8bc1d116360"
+    }
+  ],
+  "excluded": [
+    "annotation_cache",
+    "reference_evaluation_cache",
+    "embedding_cache",
+    "query_parsing_cache",
+    "index_jobs",
+    "source_files"
+  ],
+  "postgres": {
+    "file": "postgres.sql",
+    "sha256": "3e9d24d823bf812f6e4a8a09d1f7bbf7351787141e4fb35270a6769440435612",
+    "rows": {
+      "books": 3,
+      "chapters": 234,
+      "scenes": 334,
+      "token_map": 20561,
+      "tag_vocab": 53
+    }
+  }
+}

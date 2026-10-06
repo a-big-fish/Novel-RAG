@@ -1,7 +1,7 @@
 [project]
 name = "novel-rag"
 version = "0.1.0"
-description = "Independent upper-pipeline RAG service for novel writing references"
+description = "Novel understanding and writing-reference retrieval service"
 requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.12",
@@ -14,6 +14,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.5",
     "python-dotenv>=1.0",
+    "python-multipart>=0.0.20",
     "qdrant-client>=1.15,<2",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.30",

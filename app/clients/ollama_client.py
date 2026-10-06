@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+import logging
 
 import httpx
 
 from app.config import Settings, get_settings
 from app.utils.errors import ModelInputTooLargeError, StorageError
+from app.utils.text import bounded_sample
+
+logger = logging.getLogger(__name__)
 
 
 class OllamaClient:
@@ -60,17 +64,40 @@ class OllamaClient:
                 f"embedding input exceeds {limit} chars: {max(oversized)}"
             )
 
-        try:
-            response = self.client.post(
-                "/api/embed",
-                json={"model": self.model, "input": normalized},
-            )
-            response.raise_for_status()
-            payload = response.json()
-        except ModelInputTooLargeError:
-            raise
-        except Exception as exc:
-            raise StorageError(f"Ollama embedding failed: {exc}") from exc
+        attempted = normalized
+        for attempt in range(6):
+            try:
+                response = self.client.post(
+                    "/api/embed",
+                    json={"model": self.model, "input": attempted},
+                )
+                if response.status_code == 400 and (
+                    "input length exceeds the context length" in response.text.lower()
+                ) and attempt < 5 and max(map(len, attempted)) > 128:
+                    next_limit = max(128, max(map(len, attempted)) // 2)
+                    logger.warning(
+                        "embedding input exceeds model context; retrying shorter sample",
+                        extra={"model": self.model, "max_chars": next_limit},
+                    )
+                    attempted = [
+                        bounded_sample(
+                            item,
+                            head_chars=next_limit // 3,
+                            middle_chars=next_limit // 3,
+                            tail_chars=next_limit // 3,
+                            max_chars=next_limit,
+                        ) if len(item) > next_limit else item
+                        for item in attempted
+                    ]
+                    continue
+                response.raise_for_status()
+                payload = response.json()
+                break
+            except httpx.HTTPStatusError as exc:
+                detail = exc.response.text[:500]
+                raise StorageError(f"Ollama embedding failed: {exc}; {detail}") from exc
+            except Exception as exc:
+                raise StorageError(f"Ollama embedding failed: {exc}") from exc
 
         embeddings = payload.get("embeddings")
         if not isinstance(embeddings, list) or len(embeddings) != len(normalized):

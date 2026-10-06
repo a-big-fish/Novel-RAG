@@ -164,7 +164,12 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
         assert result["archived_scenes"] > 0
         assert result["indexed_scenes"] == result["selected_scenes"]
         assert qdrant.count(result["collection"]) == result["selected_scenes"]
-        assert len(repository.list_jobs(book_id)) == 6
+        jobs = repository.list_jobs(book_id)
+        assert [job["stage"] for job in reversed(jobs)] == [
+            "prepare_text", "split", "evaluate", "annotate", "embed", "store", "sync",
+        ]
+        assert all(job["status"] == "completed" for job in jobs)
+        assert next(job for job in jobs if job["stage"] == "store")["done_items"] == result["indexed_scenes"]
 
         first_collection = result["collection"]
         first_selected_count = result["selected_scenes"]
