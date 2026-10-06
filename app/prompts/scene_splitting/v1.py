@@ -1,4 +1,4 @@
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 SYSTEM_PROMPT = """你负责粗读小说并判断场景边界。只返回 JSON 对象，格式为
 {"boundaries": [2, 5]}。数字是输入中从 1 开始的段落编号，表示该段开始一个新场景。

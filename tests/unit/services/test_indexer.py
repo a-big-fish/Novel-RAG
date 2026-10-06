@@ -17,6 +17,15 @@ class FakeRepository:
     def __init__(self) -> None:
         self.embedding_cache_written = False
 
+    def scene_split_cache_key(self, **_kwargs: Any) -> str:
+        return "split-test-key"
+
+    def get_scene_split_cache(self, _input_hash: str) -> None:
+        return None
+
+    def put_scene_split_cache(self, **_kwargs: Any) -> None:
+        return None
+
     def sync_token_map(
         self,
         book_id: int,

@@ -165,3 +165,35 @@ def test_dense_llm_boundaries_are_filtered_to_complete_scenes() -> None:
     window = ["字" * 380 for _ in range(8)]
 
     assert splitter._judge_window(window) == [5]
+
+
+def test_split_window_decision_is_reused_from_persistent_cache() -> None:
+    class Cache:
+        def __init__(self) -> None:
+            self.rows: dict[str, dict[str, Any]] = {}
+
+        def scene_split_cache_key(self, **kwargs: Any) -> str:
+            return kwargs["input_text"]
+
+        def get_scene_split_cache(self, input_hash: str) -> dict[str, Any] | None:
+            return self.rows.get(input_hash)
+
+        def put_scene_split_cache(self, **kwargs: Any) -> None:
+            self.rows[kwargs["input_hash"]] = {
+                "output_json": kwargs["output_json"],
+            }
+
+    llm = FakeBoundaryLLM([2])
+    cache = Cache()
+    splitter = LLMSceneSplitter(
+        llm,
+        settings=Settings(_env_file=None, max_llm_input_chars=1500, scene_min_chars=1),
+        repository=cache,  # type: ignore[arg-type]
+    )
+    chapter = _chapter("第一段。\n\n第二段。")
+
+    first = splitter.split([chapter])
+    second = splitter.split([chapter])
+
+    assert len(llm.calls) == 1
+    assert [scene.text for scene in first] == [scene.text for scene in second]

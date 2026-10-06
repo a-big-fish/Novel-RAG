@@ -197,6 +197,7 @@ class Indexer:
 
         scene_drafts = LLMSceneSplitter(
             self.llm_client, settings=self.settings, progress=progress,
+            repository=self.repository,
         ).split(chapter_drafts)
         if not scene_drafts:
             raise NovelRagError("book contains no readable scenes")

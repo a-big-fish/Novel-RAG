@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.clients.llm_client import JsonLLMClient
 from app.config import Settings, get_settings
+from app.db.postgres import PostgresRepository
 from app.prompts.scene_splitting import v1 as scene_prompt
 from app.services.splitter import SceneDraft
 from app.utils.text import ChapterSlice, normalized_char_count, split_paragraphs
@@ -52,10 +53,12 @@ class LLMSceneSplitter:
         *,
         settings: Settings | None = None,
         progress: Callable[[int, int], None] | None = None,
+        repository: PostgresRepository | None = None,
     ) -> None:
         self.llm_client = llm_client
         self.settings = settings or get_settings()
         self.progress = progress
+        self.repository = repository
 
     @staticmethod
     def _windows(chapter: ChapterSlice, budget: int) -> list[list[str]]:
@@ -83,11 +86,32 @@ class LLMSceneSplitter:
     def _judge_window(self, window: list[str]) -> list[int]:
         if len(window) == 1:
             return []
-        decision = self.llm_client.request_typed(
-            system_prompt=scene_prompt.SYSTEM_PROMPT,
-            user_prompt=scene_prompt.build_user_prompt(window),
-            response_model=SceneBoundaryDecision,
-        )
+        user_prompt = scene_prompt.build_user_prompt(window)
+        input_hash = None
+        cached = None
+        if self.repository is not None:
+            input_hash = self.repository.scene_split_cache_key(
+                model=self.llm_client.model,
+                prompt_version=scene_prompt.PROMPT_VERSION,
+                input_text=user_prompt,
+            )
+            cached = self.repository.get_scene_split_cache(input_hash)
+        if cached is not None:
+            decision = SceneBoundaryDecision.model_validate(cached["output_json"])
+        else:
+            decision = self.llm_client.request_typed(
+                system_prompt=scene_prompt.SYSTEM_PROMPT,
+                user_prompt=user_prompt,
+                response_model=SceneBoundaryDecision,
+            )
+            if self.repository is not None and input_hash is not None:
+                self.repository.put_scene_split_cache(
+                    input_hash=input_hash,
+                    model=self.llm_client.model,
+                    prompt_version=scene_prompt.PROMPT_VERSION,
+                    input_text=user_prompt,
+                    output_json=decision.model_dump(),
+                )
         boundaries = decision.boundaries
         valid_boundaries = sorted({
             index for index in boundaries if 2 <= index <= len(window)
