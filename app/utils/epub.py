@@ -12,7 +12,7 @@ from ebooklib import ITEM_DOCUMENT, epub
 from app.utils.errors import EpubConversionError
 from app.utils.text import clean_text
 
-CONVERTER_VERSION = "epub-v1"
+CONVERTER_VERSION = "epub-v2"
 _SKIP_TAGS = ("script", "style", "nav", "noscript")
 
 
@@ -61,6 +61,35 @@ def _html_to_text(content: bytes) -> tuple[str, str]:
     return title.strip(), "\n\n".join(blocks)
 
 
+def _is_navigation_document(content: bytes) -> bool:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", XMLParsedAsHTMLWarning)
+        soup = BeautifulSoup(content, "lxml")
+    links = soup.find_all("a", href=True)
+    paragraphs = soup.find_all("p")
+    return len(links) >= 5 and len(links) >= max(1, len(paragraphs) // 2)
+
+
+def _primary_documents(
+    documents: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """Discard short front/back matter around a substantial contiguous body.
+
+    EPUB spine entries are reading units, not necessarily chapters. This
+    conservative heuristic is used only for long books with at least three
+    substantial entries; short books retain every non-navigation entry.
+    """
+    substantial = [i for i, (_, body) in enumerate(documents) if len(body) >= 3000]
+    if len(substantial) < 3:
+        return documents
+    first, last = substantial[0], substantial[-1]
+    main_chars = sum(len(body) for _, body in documents[first : last + 1])
+    total_chars = sum(len(body) for _, body in documents)
+    if main_chars * 4 < total_chars * 3:
+        return documents
+    return documents[first : last + 1]
+
+
 def convert_epub_to_txt(epub_path: Path, output_path: Path) -> Path:
     """Convert an EPUB to UTF-8 TXT following the EPUB spine order."""
 
@@ -80,14 +109,14 @@ def convert_epub_to_txt(epub_path: Path, output_path: Path) -> Path:
         if item is None or item.get_type() != ITEM_DOCUMENT:
             continue
         title, body = _html_to_text(item.get_content())
-        if body:
+        if body and not _is_navigation_document(item.get_content()):
             documents.append((title or f"章节 {len(documents) + 1}", body))
 
     # Some malformed EPUBs have a broken spine but readable document items.
     if not documents:
         for item in book.get_items_of_type(ITEM_DOCUMENT):
             title, body = _html_to_text(item.get_content())
-            if body:
+            if body and not _is_navigation_document(item.get_content()):
                 documents.append((title or f"章节 {len(documents) + 1}", body))
 
     if not documents:
@@ -95,15 +124,18 @@ def convert_epub_to_txt(epub_path: Path, output_path: Path) -> Path:
 
     parts: list[str] = []
     seen: set[tuple[str, str]] = set()
-    for title, body in documents:
+    for index, (title, body) in enumerate(_primary_documents(documents), start=1):
         key = (title, body)
         if key in seen:
             continue
         seen.add(key)
-        if body.lstrip().startswith(title):
+        # A document boundary is lost when EPUB pages are simply concatenated.
+        # Add a chapter marker when the page has no recognizable chapter title.
+        heading = title if title.startswith("第") and "章" in title[:12] else f"第{index}章"
+        if body.lstrip().startswith(heading):
             parts.append(body)
         else:
-            parts.append(f"{title}\n\n{body}")
+            parts.append(f"{heading}\n\n{body}")
 
     final_text = clean_text("\n\n".join(parts))
     if not final_text:

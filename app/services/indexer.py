@@ -18,7 +18,7 @@ from app.services.reference_evaluator import ReferenceEvaluator
 from app.services.sparse import build_sparse_vector, collect_doc_frequencies
 from app.services.splitter import split_chapters_into_scenes
 from app.services.tagger import TagVocabulary
-from app.utils.epub import convert_with_cache, sha256_file
+from app.utils.epub import CONVERTER_VERSION, convert_with_cache, sha256_file
 from app.utils.errors import NovelRagError
 from app.utils.text import clean_text, split_chapters
 
@@ -138,7 +138,7 @@ class Indexer:
             path, _cache_hit = convert_with_cache(
                 source_path,
                 self.settings.data_converted_dir,
-                converter_version=self.settings.epub_converter_version,
+                converter_version=self._epub_converter_version(),
             )
             return path
 
@@ -158,6 +158,11 @@ class Indexer:
         raw = source_path.read_text(encoding="utf-8-sig")
         _atomic_write_text(output_path, clean_text(raw))
         return output_path
+
+    def _epub_converter_version(self) -> str:
+        # Include the implementation version even when a local .env still has
+        # the previous EPUB_CONVERTER_VERSION, so stale TXT is never reused.
+        return f"{self.settings.epub_converter_version}.{CONVERTER_VERSION}"
 
     def _split_and_store(
         self,
@@ -351,7 +356,7 @@ class Indexer:
                 book_id,
                 converted_path=str(txt_path),
                 converter_version=(
-                    self.settings.epub_converter_version
+                    self._epub_converter_version()
                     if book["source_format"] == "epub"
                     else None
                 ),
