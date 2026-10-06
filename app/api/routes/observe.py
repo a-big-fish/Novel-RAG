@@ -136,7 +136,7 @@ def list_scenes(
     repository: PostgresRepository = Depends(get_repository),
 ) -> dict:
     _version_or_404(repository, book_id, version)
-    if reference_status not in {None, "selected", "archived", "evaluation_failed", "unevaluated"}:
+    if reference_status not in {None, "selected", "archived", "discarded", "evaluation_failed", "unevaluated"}:
         raise HTTPException(422, "invalid reference_status")
     total, items = repository.list_version_scenes_page(
         book_id, version, limit=limit, offset=offset,
