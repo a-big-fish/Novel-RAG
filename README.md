@@ -1,32 +1,91 @@
-# novel-rag
+# Novel-RAG
 
-面向小说写作范本检索的独立服务。上半链路负责构建可检索范本，下半链路提供单书、多书检索实验与实时观察台。
+> **让小说从文本，变成可被机器理解、检索和复用的写作经验。**
 
-`源文件登记 -> EPUB/TXT 准备 -> 章节/场景拆分 -> Reference Evaluation -> selected Scene 深度标注 -> 向量化 -> PostgreSQL Archive + Qdrant Reference Index -> 组件级直查 API`
+**Novel-RAG** 是小说创作项目 **novel-creator** 的基础能力之一，也可以独立部署为小说理解与写作范本检索服务。
 
-PostgreSQL 保留全部 Final Scene；Qdrant 只保留具有写作参考价值的 `selected` Scene。`archived` Scene 是正常小说结构资产，不是失败或废弃数据。
+## 愿景
 
-单书检索包含自然语言解析、四路 Top-N、无权重 RRF 与 Scene 详情回查。多书检索共用一次查询解析和批量 Embedding，并发执行各书召回与书内 RRF，再按书内名次轮流汇集候选。全局 Rerank 为可选步骤；上下文组装仍属后续范围。
+我们希望解决的核心问题是：**如何让 AI 真正读懂一本小说中值得学习的部分。**
 
-## 当前状态
+长篇小说中的段落承担着不同功能：剧情过渡、信息承接、日常对白和关键冲突场景的写作参考价值并不相同。有效的场景通常还包含可以迁移的节奏控制、人物互动、情绪推进、信息隐藏、叙事结构与语言风格。
 
-- Python 3.11，`uv` 管理依赖
-- FastAPI + SQLAlchemy Core + psycopg，不使用 ORM
-- PostgreSQL、Qdrant、Ollama 地址由 `.env` 配置
-- LLM 支持 `openai_compatible` 与 `codex_exec` 两种适配器
-- OpenAI 兼容适配器对 408 / 429 / 5xx 和网络错误做有限指数退避重试
-- `add_new_book` 只登记、不解析；`start_index` 显式启动索引
-- 看板“导入书籍”支持上传 EPUB、UTF-8 TXT、UTF-8 MD：先登记，再选小说后启动索引；个人摘抄入口暂显示正在开发
-- 模型输入始终经过章节/场景拆分或有界采样，禁止整书进入 LLM
-- TXT 章节解析支持普通章节行及 Markdown `#` / `##` / `###` 标题
+**Novel-RAG** 将作品转化为可检索的写作经验：
 
-## 快速开始
+```text
+小说 → 章节 → Scene → 写作参考价值判断 → 深度理解与结构化标注
+     → 语义索引 → 按创作需求检索
+```
 
-```powershell
-cd E:\novels\novel-rag
+系统保留完整的 Scene 资产，并筛选值得参考的场景。当创作系统提出“需要人物关系紧张、对白带有试探感、逐步暴露信息的场景”时，它应能找到**适合这个任务的 Scene，并说明参考价值**。
+
+项目的目标是在原始小说与 AI 创作系统之间建立 **Writing Reference Layer（写作范本层）**。它不直接生成小说正文；除了 `novel-creator`，其他 Agent、研究工具或个人知识库也能通过 HTTP API 使用它。长期目标是让机器理解：**这一段为什么有效，以及什么时候值得这样写。**
+
+## 当前能力
+
+| 环节 | 已实现内容 |
+| --- | --- |
+| 导入 | Dashboard 上传 EPUB、UTF-8 TXT、UTF-8 MD；登记后选择“小说”启动索引。个人摘抄入口尚未实现。 |
+| 拆解 | EPUB 转文本，章节与 Scene 切分；保留全部原文 Scene。 |
+| 判断与标注 | 先评估写作参考价值，再对入选 Scene 做深度结构化标注。 |
+| 索引 | PostgreSQL 保存全部场景与标注；Qdrant 为入选场景保存三路稠密向量及一路稀疏向量。 |
+| 检索 | 自然语言需求解析、四路召回、书内无权重 RRF、多书并发聚合、可选 Ollama 重排。 |
+| 观察 | Dashboard 展示导入与检索阶段、耗时、错误、解析 JSON、候选排序和完整 Scene 回查。 |
+
+`archived` Scene 仍保存在 PostgreSQL，表示它当前未被选为写作范本，不表示解析失败。多书检索只做一次查询解析与向量化，再并发检索各书；全局重排失败时保留聚合结果。个人素材库、写作质量标注与上下文组装仍在规划中。
+
+## 技术栈与整体框架
+
+- Python 3.11、FastAPI、Pydantic Settings、SQLAlchemy Core、psycopg
+- PostgreSQL：书籍、章节、全量 Scene、标注、索引任务及查询缓存
+- Qdrant：入选 Scene 的 `text-dense`、`meta-dense`、`summary-dense`、`text-sparse` 索引
+- Ollama：`bge-m3` Embedding；可选 Qwen3 Reranker
+- LLM：OpenAI 兼容 API 或 `codex_exec` 适配器，用于参考价值判断、深度标注和需求解析
+- 单页 Dashboard：导入、阶段观察、检索实验及结果详情
+
+```mermaid
+flowchart LR
+    File[EPUB / TXT / MD] --> Ingest[登记与切分]
+    Ingest --> Eval[参考价值判断]
+    Eval --> PG[(PostgreSQL 全量 Scene)]
+    Eval --> Annotate[入选 Scene 深度标注]
+    Annotate --> Embed[Ollama Embedding]
+    Embed --> Q[(Qdrant 四路索引)]
+    Need[创作需求] --> Parse[需求解析与查询向量]
+    Parse --> Q
+    Q --> RRF[各书 RRF]
+    RRF --> Merge[跨书聚合]
+    Merge --> Rerank[可选 Rerank]
+    Rerank --> Result[Scene 原文与标注回查]
+    PG --> Result
+```
+
+## 部署条件
+
+- Docker Compose；若本机运行，需 Python 3.11 与 [`uv`](https://docs.astral.sh/uv/)。
+- PostgreSQL、Qdrant、Ollama。Compose 会启动这三个服务并持久化数据。
+- 可调用的 LLM：在 `.env` 配置 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`，或配置 `codex_exec` 适配器。
+- 首次启动会下载 Embedding 模型；开启重排时还会下载 Reranker。模型下载和推理需要足够的磁盘、内存与算力，CPU 可运行但会较慢。
+- 当前 API 没有用户认证。Compose 默认只将服务端口绑定到 `127.0.0.1`；对公网开放前须自行加访问控制。
+
+### Docker Compose 启动
+
+```bash
+cp .env.example .env
+# 编辑 .env：至少设置 POSTGRES_PASSWORD 和 LLM 相关配置
+docker compose up -d --build
+```
+
+打开 `http://127.0.0.1:8000/dashboard`；交互式 API 文档在 `http://127.0.0.1:8000/docs`。Compose 中应用连接容器内 PostgreSQL、Qdrant、Ollama，宿主机的 `.env` 不需要改成容器服务名。默认仅下载 `bge-m3`；将 `.env` 中 `RERANK_ENABLED=true` 后，执行 `docker compose run --rm ollama-init` 拉取 Reranker。重排开关在每次多书检索前从 `.env` 读取；其他配置更改后应重启 `app`。
+
+Compose 使用持久化卷保存 PostgreSQL、Qdrant 和 Ollama 模型；上传书籍与转换文本在 `data/books/`、`data/converted/`。这些运行数据被 Git 忽略。首次迁移由 `migrate` 服务完成，重复运行迁移脚本不会清空数据。
+
+### 本机开发
+
+```bash
 uv sync
-Copy-Item .env.example .env
-# 填写 POSTGRES_PASSWORD、LLM_BASE_URL、LLM_API_KEY、LLM_MODEL
+cp .env.example .env
+# 配置 .env，并准备 PostgreSQL、Qdrant、Ollama
 uv run python -m app.db.migrate migrations/001_init.sql
 uv run python -m app.db.migrate migrations/002_tag_vocab_aliases.sql
 uv run python -m app.db.migrate migrations/003_reference_evaluation.sql
@@ -34,116 +93,84 @@ uv run python -m app.db.migrate migrations/004_query_parsing_cache.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-测试库迁移时增加 `--test`；迁移工具会固定使用 `novel-rag-test-2`，即使 `.env` 指向旧测试库。正式库只在准备部署时执行迁移。
+`POSTGRES_DB` 指向需要初始化的数据库。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
 
-启动后打开 `http://127.0.0.1:8000/dashboard`。页面实时读取书籍、版本、场景和向量投影。在“检索实验”可选当前书籍或多书聚合：提交后依次显示需求解析、查询向量生成、四路召回、书内 RRF 融合、跨书聚合及可选重排的实时阶段。点击阶段可查看解析后的查询 JSON、向量化输入、各书各路召回数量与耗时、融合及聚合统计、重排状态；耗时达到 1 秒时以秒显示。多书结果将最终重排置顶，逐条标明聚合前后名次、升降幅度、模型分数和来源书籍；未评分候选及重排前顺序可展开查看。每本书的召回数量和书内 RRF 也单独展示；点击候选可回查完整场景原文和标注。详细事件记录可展开查看。查询解析成功结果写入独立的 PostgreSQL 持久缓存；检索不修改书籍、场景或 Qdrant Point。
+## 三本书测试库
 
-“导入书籍”页选择本机 EPUB、TXT 或 MD 后填写书名与作者。上传 API 流式保存文件到 `BOOK_SOURCE_DIR/uploads`，受 `ALLOWED_SOURCE_ROOTS` 和 `BOOK_UPLOAD_MAX_BYTES` 限制；MD 选为小说时沿用 TXT 解析流程。登记成功弹出类型选择，“小说”启动后台索引，“自己的摘抄”暂提示正在开发。索引页轮询书籍状态与持久化 `index_jobs`，按准备、切分、评估、标注、向量化、写入索引、激活版本显示阶段、耗时和错误；刷新后可继续查看。旧索引记录没有独立“写入索引”任务时会标明未单独记录。
+`sql/fixtures/three-books/` 是可恢复的最小多书检索样本，只包含三本已获公开授权作品的当前可用版本：
 
-### 预览隔离库中的真实书籍
+| 书名 | book_id | version | Scene | Qdrant 入选点 |
+| --- | ---: | ---: | ---: | ---: |
+| 马之途 | 10 | 2 | 10 | 9 |
+| 备用联系人 | 43 | 1 | 99 | 64 |
+| 切勿操之过急 | 44 | 1 | 225 | 168 |
 
-本地隔离库 `novel-rag-test-2` 当前有三本已完成索引的书（2026-10-02 核对）：
+`postgres.sql` 包含书籍登记、章节全文、Scene 原文与标注、标签词表和稀疏词映射；`qdrant/*.jsonl` 包含对应向量和场景元数据。`manifest.json` 记录版本、行数、点数及 SHA-256。**原始 EPUB/TXT 未包含在快照中**；恢复后可以检索、浏览，若要重新索引请通过 Dashboard 重新上传原文件。
 
-| 书名 | book_id | version | 总场景 | 入选并索引 | 归档 |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 马之途 | 10 | 1 | 10 | 9 | 1 |
-| 备用联系人 | 43 | 1 | 99 | 64 | 35 |
-| 切勿操之过急 | 44 | 1 | 225 | 168 | 57 |
+快照不包含 API 密钥、查询历史、模型输入缓存、Embedding 缓存或索引任务日志。本机 `source_path` 已替换为占位路径。不要把个人数据库直接 `pg_dump` 后提交到公开仓库。
 
-新导入的两本 EPUB 均完整转换、切分并完成逐场景评估；PostgreSQL 保留全部场景，Qdrant 只存入选场景，向量点数分别为 64 和 168。书籍 ID 和数量是这个本地隔离库的快照，在其他数据库中请以 `GET /api/v1/books` 和看板为准。原书文件、转换缓存及数据库与向量库数据不属于 Git 提交内容。
+在全新 Compose 数据卷中启动并完成迁移后导入：
 
-若 `.env` 的 `POSTGRES_DB=novel_rag` 尚未迁移，直接用普通启动命令打开看板会提示缺少项目表。以下脚本仅在服务进程中切换到隔离库，不改写 `.env`：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start_dashboard_preview.ps1
+```bash
+docker compose exec app python -m scripts.restore_public_postgres sql/fixtures/three-books
+docker compose exec app python -m scripts.restore_public_qdrant sql/fixtures/three-books
 ```
 
-然后打开 `http://127.0.0.1:8007/dashboard`。预览脚本默认使用 8007 端口，可用 `-Port 8000` 等参数覆盖；正式库迁移和正式数据索引是独立操作，预览脚本不会执行它们。
-
-## API
-
-Base path 为 `/api/v1`，健康检查为 `/health`。
-
-- `POST /api/v1/books`
-- `POST /api/v1/books/upload`（multipart：`file`、`title`、可选 `author`；只登记）
-- `GET /api/v1/books`
-- `POST /api/v1/books/{book_id}/index`
-- `GET /api/v1/books/{book_id}`
-- `GET /api/v1/books/{book_id}/chapters/{chapter_index}`
-- `GET /api/v1/books/{book_id}/jobs`
-- `GET /api/v1/books/{book_id}/versions`
-- `GET /api/v1/books/{book_id}/versions/{version}/overview`
-- `GET /api/v1/books/{book_id}/versions/{version}/scenes`
-- `GET /api/v1/books/{book_id}/versions/{version}/scenes/{scene_id}`
-- `GET /api/v1/books/{book_id}/versions/{version}/projection`
-- `GET /api/v1/books/{book_id}/versions/{version}/compare?other_version=1`
-- `POST /api/v1/books/{book_id}/search`
-- `POST /api/v1/books/{book_id}/search/stream`
-- `POST /api/v1/search/multi`
-- `POST /api/v1/search/multi/stream`
-- `GET /api/v1/scenes/{scene_id}`
-- `POST /api/v1/qdrant/collections/{collection}/points/search`
-- `GET /api/v1/qdrant/collections/{collection}/points/{point_id}`
-
-Qdrant 直查只接收调用方提供的原始向量；自然语言查询请使用单书或多书 search 接口。RRF 列表返回 `scene_id` 与限长预览，完整原文通过版本化 Scene 详情接口获取。
-
-两个 `/stream` 接口使用与普通搜索相同的 JSON 请求体，返回 `application/x-ndjson`：`progress` 事件包含 `stage`，以及可能的 `book_id`、`route` 和完成数量；最终为 `result.data`，失败为 `error.message`。页面据此显示真实执行阶段，客户端需逐行读取响应流。
-
-多书请求示例：
+导入脚本要求目标 Qdrant 中不存在同名 Collection；SQL 也应仅导入到空的项目库。成功后访问 Dashboard，或提交多书检索：
 
 ```json
 {"query":"寻找人物关系紧张、对话带有试探意味的场景","book_ids":[10,43,44],"per_book_limit":20,"global_limit":50}
 ```
 
-`versions` 可省略；服务端在请求开始时固定各书当前版本。响应保留 `books` 内各书四路及 RRF 结果、逐书失败信息、`aggregation.items` 和 `final.items`。各书结果写结构化日志，不记录原文。某书失败不会抹去其他书结果；全部失败返回 503。跨书候选池使用轮流取候选，不直接比较不同书的 RRF 分数。
+源快照可由已授权的数据库重新生成：
 
-示例配置中 `RERANK_ENABLED=true`。开启后直接使用 `OLLAMA_URL` 上的 `OLLAMA_RERANK_MODEL`，对聚合后的前 `RERANK_TOP_N` 条候选逐条计算 Qwen3-Reranker 的 yes/no token 概率；其余候选保持原顺序接在后面。`RERANK_CONCURRENCY` 控制同时提交给 Ollama 的评分请求，默认 1，避免并发请求使模型服务承压。`RERANK_TIMEOUT_SECONDS` 默认为 180 秒，覆盖模型冷加载和排队时间；临时网络错误或 Ollama 429/500/502/503/504 会重试一次。Ollama 最多返回前 20 个候选 token 的概率；若 yes 或 no 超出范围，候选会得到保守边界分数并标记 `rerank_score_exact=false`，响应同时给出 `censored_count`。模型或服务失败会在 `rerank.status` 标明，并让 `final.items` 使用完整聚合顺序。该模型调用需要 Ollama `/api/generate` 支持 `logprobs` 和 `top_logprobs`，开启后会增加推理延迟；若当前机器不运行重排模型，可在 `.env` 设为 `RERANK_ENABLED=false`。
+```bash
+uv run python -m scripts.export_public_fixture --book-ids 10 43 44 --database novel-rag-test-2 --output sql/fixtures/new-export --confirm-public-rights
+```
 
-重排开关必须在项目根目录的 `.env` 中显式设置为 `RERANK_ENABLED=true` 或 `RERANK_ENABLED=false`。多书检索接口在每次请求开始时通过 `python-dotenv` 重新读取该值；修改文件后，下次检索立即生效，无需重启服务。正在运行的检索沿用启动该次请求时的值。缺失或非法值会返回 503 并指出配置项。其他配置仍按现有启动时加载方式处理。
+### 作品与侵权联系
 
-重排诊断日志包括 `multi_book_rerank_candidate_prepared`（候选序号与场景 ID）、`rerank_request_failed`（请求次数、HTTP 状态码、耗时、是否重试及截断到 500 字符的 Ollama 错误响应）、`rerank_candidate_scored` 和批次完成或失败事件。程序不会主动记录查询正文或场景原文；同一次重排的日志共用 `batch_id`，可用 `candidate_index` 对照该批的 `scene_id`。若重排失败，先查看 `rerank_request_failed` 的 `response_body` 和 `multi_book_rerank_failed` 的异常栈。
+测试库中的三本作品及其衍生标注仅用于展示小说理解与检索功能，不因代码仓库公开而授予第三方复制、改编或再分发作品的权利。**若权利人认为相关内容侵权，请通过本仓库 Issues 联系维护者；收到通知后会立即处理、删除相关公开测试数据，并处理仓库历史中的相应内容。**
 
-对 `ready` 书籍再次调用索引接口会构建新 version；旧 version 在新 version 通过 selected-point 一致性校验并激活前保持可用。
+项目代码采用 [MIT 许可证](LICENSE)，作品原文及测试库内容不适用该许可证。仓库主页：[a-big-fish/Novel-RAG](https://github.com/a-big-fish/Novel-RAG)。
+
+## API 文档
+
+运行后访问 `/docs` 查看 OpenAPI 交互文档，`/openapi.json` 获取机器可读规范。健康检查为 `GET /health`，业务接口统一以 `/api/v1` 开头。
+
+| 用途 | 主要接口 |
+| --- | --- |
+| 书籍登记与索引 | `POST /books/upload`、`GET /books`、`POST /books/{book_id}/index`、`GET /books/{book_id}/jobs` |
+| 版本与场景 | `GET /books/{book_id}/versions`、`GET /books/{book_id}/versions/{version}/scenes`、`GET /scenes/{scene_id}` |
+| 单书检索 | `POST /books/{book_id}/search`、`POST /books/{book_id}/search/stream` |
+| 多书检索 | `POST /search/multi`、`POST /search/multi/stream` |
+| 组件调试 | `POST /qdrant/collections/{collection}/points/search`、`GET /qdrant/collections/{collection}/points/{point_id}` |
+
+两个 `/stream` 接口返回 NDJSON：`progress` 表示阶段进度，`result.data` 是最终结果，`error.message` 表示失败。完整的 Scene 原文通过数据库详情接口回查；RRF 候选仅携带 `scene_id` 与限长预览。
+
+全局重排由 `.env` 中的 `RERANK_ENABLED` 控制。启用后使用 `OLLAMA_RERANK_MODEL` 对跨书候选评分；失败时 `rerank.status` 和诊断日志会给出原因，最终候选退回聚合顺序。重排可能明显增加检索时间。
 
 ## 测试
 
-```powershell
-# 无外部服务依赖
+```bash
 uv run pytest tests/unit -q
-
-# 测试库、真实 Qdrant 与合成 EPUB
 uv run pytest tests/integration -q -m integration
-
-# 手工真实链路验收：结果保留在 novel-rag-test-2
-uv run python -B -m tests.real.run_ma_zhitu
 ```
 
-测试数据约束：
+单元测试不依赖外部服务；集成测试需要 PostgreSQL、Qdrant 和测试隔离环境。模型测试仅发送 Scene 或有界样本，不会把整本书作为单次模型输入。测试库快照的数据恢复还会检查 SQL 行数与 Qdrant Point 数量。
 
-- 允许全量 EPUB 转 TXT 作为本地缓存。
-- 禁止把全量书或整章无界文本送入 LLM / Embedding。
-- 默认自动化模型测试只使用约 4000 字合成微型小说，或从 TXT 截取的开头/中间/结尾章节。
-- `tests.real.run_ma_zhitu` 手工脚本使用 `tests/马之途.txt`。隔离库中的另外两本 EPUB 已完成全书索引；每次模型调用仍只接收单个场景的有界采样，不把整本原文放入单次 Prompt。
-
-## 目录
+## 目录结构
 
 ```text
-app/
-  api/                FastAPI 路由与依赖
-  clients/            LLM / Ollama 适配器
-  db/                 PostgreSQL Core 仓储、Qdrant 适配器、迁移入口
-  prompts/            Reference Evaluation / Deep Annotation / 查询解析提示词
-  services/           索引编排、查询解析、四路召回和 RRF
-                      多书并发聚合与可选全局 Rerank
-  utils/              EPUB 转换、文本处理、异常
-data/
-  books/
-  converted/          EPUB/TXT 转换缓存
-migrations/           001 初始化、002 tag_vocab 兼容、003 Reference Evaluation、004 查询缓存
-dashboard/            实时只读索引观察与检索实验页面
-tests/
-  unit/
-  integration/
-  real/               手工真实链路验收脚本
-  fixtures/           微型小说、截断书、合成 EPUB
+app/                    FastAPI、LLM/Ollama 客户端、索引与检索服务
+app/prompts/            判断、深度标注、需求解析提示词
+dashboard/              导入、索引进度和检索实验界面
+migrations/             PostgreSQL 迁移历史
+sql/fixtures/three-books/
+                        PostgreSQL 数据 SQL、Qdrant JSONL、校验清单
+scripts/                测试库导出、Qdrant 恢复、本地预览脚本
+tests/                  单元、集成、手工真实链路测试
+data/                   本地上传与转换缓存，不进入 Git
+compose.yaml            PostgreSQL、Qdrant、Ollama 与应用编排
+Dockerfile              应用镜像
 ```
