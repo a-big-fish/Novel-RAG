@@ -34,6 +34,32 @@
 
 `archived` Scene 仍保存在 PostgreSQL，表示它当前未被选为写作范本，不表示解析失败。多书检索只做一次查询解析与向量化，再并发检索各书；全局重排失败时保留聚合结果。个人素材库、写作质量标注与上下文组装仍在规划中。
 
+## 界面预览
+
+### 场景与标注观察
+
+查看 Scene 的切分信息、参考价值评估、标注和全书标签分布。
+
+![场景与标注观察界面](images/scene-annotation-overview.png)
+
+### 多书检索实验
+
+查看需求解析、四路召回、书内融合、跨书聚合与重排的阶段详情和耗时。
+
+![多书检索实验与流程详情](images/multi-book-search-progress.png)
+
+### 重排结果
+
+展示重排前后的名次变化、模型分数与场景来源。
+
+![多书检索的最终重排结果](images/multi-book-rerank-results.png)
+
+### 书籍导入与索引进度
+
+上传书籍后查看切分、评估、标注、向量化和索引激活的执行状态。
+
+![书籍导入和索引进度界面](images/book-upload-indexing-progress.png)
+
 ## 技术栈与整体框架
 
 - Python 3.11、FastAPI、Pydantic Settings、SQLAlchemy Core、psycopg
@@ -165,6 +191,7 @@ uv run pytest tests/integration -q -m integration
 app/                    FastAPI、LLM/Ollama 客户端、索引与检索服务
 app/prompts/            判断、深度标注、需求解析提示词
 dashboard/              导入、索引进度和检索实验界面
+images/                 README 展示用的界面截图
 migrations/             PostgreSQL 迁移历史
 sql/fixtures/three-books/
                         PostgreSQL 数据 SQL、Qdrant JSONL、校验清单
