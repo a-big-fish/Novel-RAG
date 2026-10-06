@@ -19,6 +19,7 @@ from app.db.models import (
     index_jobs,
     query_parsing_cache,
     scene_split_cache,
+    scene_quality_cache,
     reference_evaluation_cache,
     scenes,
     tag_vocab,
@@ -136,6 +137,7 @@ class PostgresRepository:
                 func.count().label("total_scenes"),
                 func.count().filter(scenes.c.reference_status == "selected").label("selected"),
                 func.count().filter(scenes.c.reference_status == "archived").label("archived"),
+                func.count().filter(scenes.c.reference_status == "discarded").label("discarded"),
                 func.count().filter(scenes.c.reference_status == "evaluation_failed").label("evaluation_failed"),
             )
             .where(scenes.c.book_id == book_id)
@@ -162,6 +164,7 @@ class PostgresRepository:
                     scenes.c.chapter_start_index, scenes.c.chapter_end_index,
                     scenes.c.reference_status, scenes.c.reference_score,
                     scenes.c.reference_reason, scenes.c.summary,
+                    scenes.c.quality_screen_status, scenes.c.quality_screen_reason,
                     scenes.c.style_summary, scenes.c.usage_hint,
                     scenes.c.scene_type, scenes.c.technique,
                     scenes.c.style_tags, scenes.c.emotion_tags,
@@ -301,6 +304,10 @@ class PostgresRepository:
                 "char_count": statement.excluded.char_count,
                 "split_reason": statement.excluded.split_reason,
                 "is_cross_chapter": statement.excluded.is_cross_chapter,
+                "quality_screen_status": statement.excluded.quality_screen_status,
+                "quality_screen_reason": statement.excluded.quality_screen_reason,
+                "quality_screen_prompt_version": statement.excluded.quality_screen_prompt_version,
+                "quality_screen_meta_json": statement.excluded.quality_screen_meta_json,
                 "reference_status": statement.excluded.reference_status,
                 "reference_score": statement.excluded.reference_score,
                 "reference_reason": statement.excluded.reference_reason,
@@ -468,6 +475,35 @@ class PostgresRepository:
                 output_json=dict(output_json),
             )
             .on_conflict_do_nothing(index_elements=[scene_split_cache.c.input_hash])
+        )
+        with self.engine.begin() as connection:
+            connection.execute(statement)
+
+    @staticmethod
+    def scene_quality_cache_key(
+        *, model: str, prompt_version: str, input_text: str,
+    ) -> str:
+        payload = "\x1f".join((model, prompt_version, input_text))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def get_scene_quality_cache(self, input_hash: str) -> Mapping[str, Any] | None:
+        with self.engine.connect() as connection:
+            return connection.execute(
+                select(scene_quality_cache).where(scene_quality_cache.c.input_hash == input_hash)
+            ).mappings().first()
+
+    def put_scene_quality_cache(
+        self, *, input_hash: str, model: str, prompt_version: str,
+        input_text: str, output_json: Mapping[str, Any],
+    ) -> None:
+        statement = (
+            pg_insert(scene_quality_cache)
+            .values(
+                input_hash=input_hash, model=model,
+                prompt_version=prompt_version, input_text=input_text,
+                output_json=dict(output_json),
+            )
+            .on_conflict_do_nothing(index_elements=[scene_quality_cache.c.input_hash])
         )
         with self.engine.begin() as connection:
             connection.execute(statement)

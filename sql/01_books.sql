@@ -11,7 +11,7 @@ CREATE TABLE books (
     converter_version TEXT,
     status           TEXT        NOT NULL DEFAULT 'pending'
                      CHECK (status IN (
-                         'pending', 'converting', 'splitting', 'evaluating',
+                         'pending', 'converting', 'splitting', 'screening', 'evaluating',
                          'annotating', 'indexing', 'ready', 'failed'
                      )),
     current_version  INTEGER     NOT NULL DEFAULT 0,
@@ -19,6 +19,7 @@ CREATE TABLE books (
     total_scenes     INTEGER     NOT NULL DEFAULT 0,
     selected_scenes  INTEGER     NOT NULL DEFAULT 0,
     archived_scenes  INTEGER     NOT NULL DEFAULT 0,
+    discarded_scenes INTEGER     NOT NULL DEFAULT 0,
     evaluation_failed_scenes INTEGER NOT NULL DEFAULT 0,
     error_message    TEXT,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),

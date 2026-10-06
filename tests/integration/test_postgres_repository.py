@@ -14,6 +14,7 @@ from app.db.models import (
     index_jobs,
     reference_evaluation_cache,
     scene_split_cache,
+    scene_quality_cache,
     scenes,
     tag_vocab,
     token_map,
@@ -31,6 +32,9 @@ def test_postgres_repository_round_trip() -> None:
     source_sha = hashlib.sha256(marker.encode()).hexdigest()
     split_hash = repository.scene_split_cache_key(
         model="test-model", prompt_version="v2", input_text=marker,
+    )
+    quality_hash = repository.scene_quality_cache_key(
+        model="test-model", prompt_version="v1", input_text=marker,
     )
     book_id: int | None = None
 
@@ -63,6 +67,14 @@ def test_postgres_repository_round_trip() -> None:
         assert repository.get_scene_split_cache(split_hash)["output_json"] == {
             "boundaries": [2]
         }
+        repository.put_scene_quality_cache(
+            input_hash=quality_hash,
+            model="test-model",
+            prompt_version="v1",
+            input_text=marker,
+            output_json={"decision": "reject", "category": "duplicate", "reason": "重复"},
+        )
+        assert repository.get_scene_quality_cache(quality_hash)["output_json"]["category"] == "duplicate"
 
         repository.replace_chapters(
             book_id,
@@ -287,6 +299,11 @@ def test_postgres_repository_round_trip() -> None:
                 connection.execute(
                     delete(scene_split_cache).where(
                         scene_split_cache.c.input_hash == split_hash
+                    )
+                )
+                connection.execute(
+                    delete(scene_quality_cache).where(
+                        scene_quality_cache.c.input_hash == quality_hash
                     )
                 )
                 connection.execute(

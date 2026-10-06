@@ -17,6 +17,7 @@ from app.db.models import (
     embedding_cache,
     index_jobs,
     reference_evaluation_cache,
+    scene_quality_cache,
     scenes,
     token_map,
 )
@@ -24,6 +25,7 @@ from app.db.postgres import PostgresDatabase, PostgresRepository
 from app.db.qdrant import QdrantAdapter
 from app.services.indexer import Indexer
 from app.services.llm_splitter import CrossChapterDecision, SceneBoundaryDecision
+from app.services.scene_quality import SceneQualityDecision
 from app.services.schema import (
     ReferenceDimensions,
     ReferenceEvaluation,
@@ -49,6 +51,11 @@ class FakeLLM:
             )
         if kwargs["response_model"] is CrossChapterDecision:
             return CrossChapterDecision(same_scene=False)
+        if kwargs["response_model"] is SceneQualityDecision:
+            return SceneQualityDecision(
+                decision="keep", category="none",
+                reason="该片段在本轮合成链路测试中保留以验证后续索引。",
+            )
         if kwargs["response_model"] is ReferenceEvaluation:
             scene_text = kwargs["user_prompt"]
             selected = not self.archive_all and (
@@ -110,6 +117,10 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
             "第一章 雨夜来客",
             f"第一章 雨夜来客 {marker}",
             1,
+        ) + (
+            "\n\n第十章 新的发现\n\n"
+            "她在雨夜打开封存已久的账本，发现每一页都写着不同的日期。\n\n"
+            "她把其中一页拍下，带着证据走进警局，案件终于有了新的方向。"
         ),
         encoding="utf-8",
     )
@@ -169,12 +180,12 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
         assert book["current_version"] == 1
         assert repository.active_scene_count(book_id, 1) == result["scenes"]
         assert result["selected_scenes"] > 0
-        assert result["archived_scenes"] > 0
+        assert result["discarded_scenes"] > 0
         assert result["indexed_scenes"] == result["selected_scenes"]
         assert qdrant.count(result["collection"]) == result["selected_scenes"]
         jobs = repository.list_jobs(book_id)
         assert [job["stage"] for job in reversed(jobs)] == [
-            "prepare_text", "split", "evaluate", "annotate", "embed", "store", "sync",
+            "prepare_text", "split", "screen", "evaluate", "annotate", "embed", "store", "sync",
         ]
         assert all(job["status"] == "completed" for job in jobs)
         assert next(job for job in jobs if job["stage"] == "store")["done_items"] == result["indexed_scenes"]
@@ -188,7 +199,7 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
 
         assert reindexed["version"] == 2
         assert reindexed["selected_scenes"] == 0
-        assert reindexed["archived_scenes"] == reindexed["scenes"]
+        assert reindexed["archived_scenes"] + reindexed["discarded_scenes"] == reindexed["scenes"]
         assert qdrant.count(reindexed["collection"]) == 0
         assert qdrant.count(first_collection) == first_selected_count
         book = repository.get_book(book_id)
@@ -213,6 +224,11 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
                 connection.execute(
                     delete(reference_evaluation_cache).where(
                         reference_evaluation_cache.c.model == FakeLLM.model
+                    )
+                )
+                connection.execute(
+                    delete(scene_quality_cache).where(
+                        scene_quality_cache.c.model == FakeLLM.model
                     )
                 )
                 connection.execute(
