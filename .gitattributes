@@ -1,0 +1,3 @@
+sql/fixtures/three-books/postgres.sql text eol=lf
+sql/fixtures/three-books/qdrant/*.jsonl text eol=lf
+sql/fixtures/three-books/manifest.json text eol=lf
