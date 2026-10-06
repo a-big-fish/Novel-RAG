@@ -14,9 +14,9 @@ from app.db.postgres import PostgresRepository
 from app.db.qdrant import QdrantAdapter
 from app.services.annotator import Annotator
 from app.services.embedder import Embedder
+from app.services.llm_splitter import LLMSceneSplitter
 from app.services.reference_evaluator import ReferenceEvaluator
 from app.services.sparse import build_sparse_vector, collect_doc_frequencies
-from app.services.splitter import split_chapters_into_scenes
 from app.services.tagger import TagVocabulary
 from app.utils.epub import CONVERTER_VERSION, convert_with_cache, sha256_file
 from app.utils.errors import NovelRagError
@@ -189,7 +189,9 @@ class Indexer:
                 for chapter in chapter_drafts
             ],
         )
-        scene_drafts = split_chapters_into_scenes(chapter_drafts)
+        scene_drafts = LLMSceneSplitter(
+            self.llm_client, settings=self.settings,
+        ).split(chapter_drafts)
         if not scene_drafts:
             raise NovelRagError("book contains no readable scenes")
 

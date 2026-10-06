@@ -23,6 +23,7 @@ from app.db.models import (
 from app.db.postgres import PostgresDatabase, PostgresRepository
 from app.db.qdrant import QdrantAdapter
 from app.services.indexer import Indexer
+from app.services.llm_splitter import CrossChapterDecision, SceneBoundaryDecision
 from app.services.schema import (
     ReferenceDimensions,
     ReferenceEvaluation,
@@ -42,6 +43,12 @@ class FakeLLM:
         self.archive_all = False
 
     def request_typed(self, **kwargs: Any) -> Any:
+        if kwargs["response_model"] is SceneBoundaryDecision:
+            return SceneBoundaryDecision(
+                boundaries=[2] if "[2]" in kwargs["user_prompt"] else [],
+            )
+        if kwargs["response_model"] is CrossChapterDecision:
+            return CrossChapterDecision(same_scene=False)
         if kwargs["response_model"] is ReferenceEvaluation:
             scene_text = kwargs["user_prompt"]
             selected = not self.archive_all and (
