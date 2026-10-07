@@ -217,7 +217,7 @@ uv run pytest tests/integration -q -m integration
 
 ```text
 app/                    FastAPI、LLM/Ollama 客户端、索引与检索服务
-app/prompts/            判断、深度标注、需求解析提示词
+app/prompts/            切分、判断、深度标注、需求解析与重排提示词
 dashboard/              导入、索引进度和检索实验界面
 images/                 README 展示用的界面截图
 migrations/             PostgreSQL 迁移历史

@@ -8,17 +8,10 @@ from uuid import uuid4
 
 import httpx
 
+from app.prompts.rerank import v1 as rerank_prompt
 from app.utils.errors import StorageError
 
 logger = logging.getLogger(__name__)
-
-_PREFIX = (
-    '<|im_start|>system\nJudge whether the Document meets the requirements '
-    'based on the Query and the Instruct provided. Note that the answer can '
-    'only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
-)
-_SUFFIX = '<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n'
-_INSTRUCTION = 'Given a writing request, retrieve novel scenes useful as writing references'
 
 
 class RerankClient:
@@ -42,10 +35,7 @@ class RerankClient:
             self.client.close()
 
     def _score(self, query: str, document: str, index: int) -> tuple[float, bool]:
-        prompt = (
-            f"{_PREFIX}<Instruct>: {_INSTRUCTION}\n"
-            f"<Query>: {query}\n<Document>: {document}{_SUFFIX}"
-        )
+        prompt = rerank_prompt.build_prompt(query, document)
         payload = {
             "model": self.model, "prompt": prompt, "raw": True,
             "stream": False, "logprobs": True, "top_logprobs": 20,

@@ -40,6 +40,14 @@ def test_rerank_client_uses_ollama_model_and_yes_no_probabilities():
     assert all(payload["model"] == "my-ollama-reranker" for _, payload in requests)
     assert all(payload["raw"] and payload["logprobs"] for _, payload in requests)
     assert all("雨夜" in payload["prompt"] for _, payload in requests)
+    assert requests[0][1]["prompt"] == (
+        '<|im_start|>system\nJudge whether the Document meets the requirements '
+        'based on the Query and the Instruct provided. Note that the answer can '
+        'only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
+        '<Instruct>: Given a writing request, retrieve novel scenes useful as writing references\n'
+        '<Query>: 雨夜\n<Document>: 场景甲'
+        '<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n'
+    )
     client.close()
 
 
