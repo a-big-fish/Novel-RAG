@@ -13,7 +13,7 @@
 **Novel-RAG** 将作品转化为可检索的写作经验：
 
 ```text
-小说 → 章节 → Scene → 写作参考价值判断 → 深度理解与结构化标注
+小说 → 章节 → Scene → 场景质量全筛 → 写作参考价值判断 → 深度理解与结构化标注
      → 语义索引 → 按创作需求检索
 ```
 
@@ -68,25 +68,45 @@
 - PostgreSQL：书籍、章节、全量 Scene、标注、索引任务及查询缓存
 - Qdrant：入选 Scene 的 `text-dense`、`meta-dense`、`summary-dense`、`text-sparse` 索引
 - Ollama：`bge-m3` Embedding；可选 Qwen3 Reranker
-- LLM：OpenAI 兼容 API 或 `codex_exec` 适配器，用于参考价值判断、深度标注和需求解析
+- LLM：OpenAI 兼容 API 或 `codex_exec` 适配器，用于场景切分、质量全筛、参考价值判断、深度标注和需求解析
 - 单页 Dashboard：导入、阶段观察、检索实验及结果详情
 
+### 拆书与索引
+
 ```mermaid
-flowchart LR
-    File[EPUB / TXT / MD] --> Ingest[登记与切分]
-    Ingest --> Eval[参考价值判断]
-    Eval --> PG[(PostgreSQL 全量 Scene)]
-    Eval --> Annotate[入选 Scene 深度标注]
-    Annotate --> Embed[Ollama Embedding]
-    Embed --> Q[(Qdrant 四路索引)]
-    Need[创作需求] --> Parse[需求解析与查询向量]
-    Parse --> Q
-    Q --> RRF[各书 RRF]
-    RRF --> Merge[跨书聚合]
-    Merge --> Rerank[可选 Rerank]
-    Rerank --> Result[Scene 原文与标注回查]
-    PG --> Result
+flowchart TB
+    Upload["Dashboard 上传 EPUB / TXT / MD"] --> Register["书籍登记与后台索引任务"]
+    Register --> Chapter["文本解析与章节整理"]
+    Chapter --> Split["LLM 粗读与 Scene 切分"]
+    Split --> Screen["场景质量全筛：垃圾与近重复片段"]
+    Screen --> Evaluate["写作参考价值评估"]
+    Evaluate --> Annotate["入选 Scene 深度结构化标注"]
+    Annotate --> Index["建立原文、元数据、摘要向量及稀疏索引"]
+    Index --> PG["PostgreSQL：全量 Scene、标注、任务状态"]
+    Index --> Qdrant["Qdrant：入选 Scene 的四路索引"]
 ```
+
+Dashboard 可查看索引任务的阶段、耗时与详情。质量全筛剔除的 `discarded` Scene 和参考价值评估未入选的 `archived` Scene 保留在 PostgreSQL，不进入 Qdrant。
+
+### 多书聚合检索
+
+```mermaid
+flowchart TB
+    Need["Dashboard / HTTP API：创作检索需求"] --> Parse["LLM 需求解析与查询改写"]
+    Parse --> Vector["查询向量化：只执行一轮"]
+    Vector --> Dispatch["向各本书并发检索"]
+    Dispatch --> Recall["每本书四路召回：Qdrant"]
+    Recall --> RRF["书内无权重 RRF 融合"]
+    RRF --> Merge["跨书聚合与全局排序"]
+    Merge --> Switch{"开启 Rerank？"}
+    Switch -- 是 --> Rerank["模型重排"]
+    Switch -- 否 --> Lookup["按 Scene ID 回查 PostgreSQL"]
+    Rerank --> Lookup
+    Lookup --> Result["返回原文、标注、来源与排序信息"]
+    Result --> Display["Dashboard 结果与阶段详情"]
+```
+
+Rerank 仅在检索时按配置执行；未开启时直接返回聚合排序结果。
 
 ## 部署条件
 
