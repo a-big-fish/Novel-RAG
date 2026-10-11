@@ -123,6 +123,48 @@ class PostgresRepository:
             ).mappings().first()
         return row
 
+    def find_book_for_upload(
+        self, *, title: str, author: str, source_sha256: str,
+    ) -> Mapping[str, Any] | None:
+        with self.engine.connect() as connection:
+            by_content = connection.execute(
+                select(books).where(books.c.source_sha256 == source_sha256)
+            ).mappings().first()
+            if by_content is not None:
+                return by_content
+            return connection.execute(
+                select(books).where(
+                    books.c.title == title,
+                    books.c.author == author,
+                ).order_by(books.c.id)
+            ).mappings().first()
+
+    def replace_book_source(
+        self, book_id: int, *, source_path: str,
+        source_format: str, source_sha256: str,
+    ) -> Mapping[str, Any]:
+        with self.engine.begin() as connection:
+            book = connection.execute(
+                select(books).where(books.c.id == book_id).with_for_update()
+            ).mappings().first()
+            if book is None:
+                raise StorageError(f"book not found: {book_id}")
+            if book["status"] not in {"pending", "failed", "ready"}:
+                raise StorageError(f"book is already indexing: {book_id}")
+            connection.execute(
+                update(books).where(books.c.id == book_id).values(
+                    source_path=source_path,
+                    source_format=source_format,
+                    source_sha256=source_sha256,
+                    converted_path=None,
+                    converter_version=None,
+                    error_message=None,
+                )
+            )
+            return connection.execute(
+                select(books).where(books.c.id == book_id)
+            ).mappings().one()
+
     def list_books(self) -> list[Mapping[str, Any]]:
         with self.engine.connect() as connection:
             rows = connection.execute(

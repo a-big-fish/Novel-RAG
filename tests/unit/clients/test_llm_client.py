@@ -121,3 +121,42 @@ def test_openai_compatible_retries_transient_error() -> None:
 
     assert result.summary == "ok"
     assert route.call_count == 2
+
+
+@pytest.mark.parametrize("bad_content", [None, "", "not json"])
+@respx.mock
+def test_openai_compatible_retries_invalid_success_response(bad_content: str | None) -> None:
+    route = respx.post("http://llm.test/v1/chat/completions").mock(
+        side_effect=[
+            httpx.Response(200, json={"choices": [{"message": {"content": bad_content}}]}),
+            httpx.Response(200, json={"choices": [{"message": {"content": '{"summary":"ok"}'}}]}),
+        ]
+    )
+    adapter = OpenAICompatibleClient(
+        base_url="http://llm.test/v1",
+        api_key="secret",
+        model="demo",
+        client=httpx.Client(),
+        settings=Settings(llm_max_retries=1, llm_retry_backoff_seconds=0),
+    )
+
+    assert adapter.request_json(system_prompt="s", user_prompt="u") == {"summary": "ok"}
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_openai_compatible_reports_invalid_response_after_retries() -> None:
+    route = respx.post("http://llm.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"choices": [{"message": {"content": None}}]})
+    )
+    adapter = OpenAICompatibleClient(
+        base_url="http://llm.test/v1",
+        api_key="secret",
+        model="demo",
+        client=httpx.Client(),
+        settings=Settings(llm_max_retries=1, llm_retry_backoff_seconds=0),
+    )
+
+    with pytest.raises(StorageError, match="non-text response"):
+        adapter.request_json(system_prompt="s", user_prompt="u")
+    assert route.call_count == 2

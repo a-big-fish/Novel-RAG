@@ -32,6 +32,21 @@ class FakeRepository:
     def get_book(self, book_id: int) -> dict[str, Any] | None:
         return self.books.get(book_id)
 
+    def find_book_for_upload(
+        self, *, title: str, author: str, source_sha256: str,
+    ) -> dict[str, Any] | None:
+        for book in self.books.values():
+            if book["source_sha256"] == source_sha256:
+                return book
+        for book in self.books.values():
+            if book["title"] == title and book["author"] == author:
+                return book
+        return None
+
+    def replace_book_source(self, book_id: int, **values: Any) -> dict[str, Any]:
+        self.books[book_id].update(values)
+        return self.books[book_id]
+
     def claim_book_for_index(
         self,
         book_id: int,

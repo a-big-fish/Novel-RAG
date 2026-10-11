@@ -197,3 +197,38 @@ def test_split_window_decision_is_reused_from_persistent_cache() -> None:
 
     assert len(llm.calls) == 1
     assert [scene.text for scene in first] == [scene.text for scene in second]
+
+
+def test_cross_chapter_decision_is_reused_from_persistent_cache() -> None:
+    class Cache:
+        def __init__(self) -> None:
+            self.rows: dict[str, dict[str, Any]] = {}
+
+        def scene_split_cache_key(self, **kwargs: Any) -> str:
+            return f"{kwargs['prompt_version']}:{kwargs['input_text']}"
+
+        def get_scene_split_cache(self, input_hash: str) -> dict[str, Any] | None:
+            return self.rows.get(input_hash)
+
+        def put_scene_split_cache(self, **kwargs: Any) -> None:
+            self.rows[kwargs["input_hash"]] = {"output_json": kwargs["output_json"]}
+
+    first = _chapter("第一章\n\n两人在雨夜交谈。")
+    second = ChapterSlice(
+        chapter_index=2, title="第二章",
+        text="第二章\n\n他们继续刚才的对话。",
+        start_paragraph_index=2, end_paragraph_index=3,
+        char_count=20,
+    )
+    cache = Cache()
+    llm = FakeBoundaryLLM([], same_scene=True)
+    splitter = LLMSceneSplitter(
+        llm,
+        settings=Settings(_env_file=None, max_llm_input_chars=1500),
+        repository=cache,  # type: ignore[arg-type]
+    )
+
+    assert len(splitter.split([first, second])) == 1
+    llm.same_scene = False
+    assert len(splitter.split([first, second])) == 1
+    assert len(llm.calls) == 3

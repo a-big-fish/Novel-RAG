@@ -21,7 +21,7 @@ from app.api.dependencies import (
 from app.config import Settings
 from app.db.postgres import PostgresRepository
 from app.utils.epub import sha256_file
-from app.utils.errors import SourceValidationError
+from app.utils.errors import SourceValidationError, StorageError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/books", tags=["books"])
@@ -51,6 +51,7 @@ class AddBookResponse(BaseModel):
     source_format: str
     index_started: bool = False
     created: bool
+    next_version: int | None = None
 
 
 class StartIndexResponse(BaseModel):
@@ -102,11 +103,16 @@ def _validate_uploaded_epub(path: Path) -> None:
         raise SourceValidationError("上传文件不是有效的 EPUB") from exc
 
 
-@router.post("/upload", response_model=AddBookResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/upload", response_model=AddBookResponse, response_model_exclude_none=True,
+    status_code=status.HTTP_201_CREATED,
+)
 async def upload_book(
     file: UploadFile = File(...),
     title: str = Form(..., min_length=1, max_length=300),
     author: str = Form("", max_length=300),
+    duplicate_action: str = Form("reject"),
+    duplicate_book_id: int | None = Form(None),
     settings: Settings = Depends(get_app_settings),
     repository: PostgresRepository = Depends(get_repository),
 ) -> AddBookResponse:
@@ -119,6 +125,8 @@ async def upload_book(
         raise HTTPException(503, "上传目录不在 ALLOWED_SOURCE_ROOTS 中")
     if not title.strip():
         raise HTTPException(422, "书名不能为空")
+    if duplicate_action not in {"reject", "new_version"}:
+        raise HTTPException(422, "未知的重复上传操作")
     upload_dir.mkdir(parents=True, exist_ok=True)
     temp_path: Path | None = None
     destination: Path | None = None
@@ -153,22 +161,68 @@ async def upload_book(
         if suffix == ".epub":
             _validate_uploaded_epub(temp_path)
         source_format = "epub" if suffix == ".epub" else "txt"
-        destination = upload_dir / f"{digest.hexdigest()}{suffix}"
+        source_sha256 = digest.hexdigest()
+        existing = repository.find_book_for_upload(
+            title=title.strip(), author=author.strip(),
+            source_sha256=source_sha256,
+        )
+        if existing is not None:
+            book_id = int(existing["id"])
+            next_version = int(existing["current_version"] or 0) + 1
+            if existing["status"] not in {"pending", "failed", "ready"}:
+                raise HTTPException(409, "这本书正在索引，请完成后再生成新版本")
+            if duplicate_action == "reject":
+                raise HTTPException(409, {
+                    "code": "duplicate_book",
+                    "book_id": book_id,
+                    "title": existing["title"],
+                    "current_version": int(existing["current_version"] or 0),
+                    "next_version": next_version,
+                })
+            if duplicate_book_id != book_id:
+                raise HTTPException(409, "重复书籍已变化，请重新上传确认")
+            if source_sha256 != existing["source_sha256"]:
+                destination = upload_dir / f"{source_sha256}{suffix}"
+                if not destination.exists():
+                    os.replace(temp_path, destination)
+                    temp_path = None
+                    destination_created = True
+                try:
+                    repository.replace_book_source(
+                        book_id, source_path=str(destination),
+                        source_format=source_format, source_sha256=source_sha256,
+                    )
+                except StorageError as exc:
+                    raise HTTPException(409, str(exc)) from exc
+                registered = True
+            return AddBookResponse(
+                book_id=book_id, status=str(existing["status"]),
+                source_format=source_format, created=False,
+                next_version=next_version,
+            )
+        if duplicate_action == "new_version":
+            raise HTTPException(409, "重复书籍已变化，请重新上传确认")
+        destination = upload_dir / f"{source_sha256}{suffix}"
         if not destination.exists():
             os.replace(temp_path, destination)
             temp_path = None
             destination_created = True
         book_id, created = repository.register_book(
             title=title.strip(), author=author.strip(), source_path=str(destination),
-            source_format=source_format, source_sha256=digest.hexdigest(),
+            source_format=source_format, source_sha256=source_sha256,
         )
         registered = created
-        if not created and destination_created:
-            destination.unlink(missing_ok=True)
-            destination_created = False
+        if not created:
+            existing = repository.get_book(book_id)
+            raise HTTPException(409, {
+                "code": "duplicate_book", "book_id": book_id,
+                "title": existing["title"],
+                "current_version": int(existing["current_version"] or 0),
+                "next_version": int(existing["current_version"] or 0) + 1,
+            })
         return AddBookResponse(
-            book_id=book_id, status="pending" if created else str(repository.get_book(book_id)["status"]),
-            source_format=source_format, created=created,
+            book_id=book_id, status="pending",
+            source_format=source_format, created=True,
         )
     except SourceValidationError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -198,7 +252,10 @@ def _run_index(
             indexer.close()
 
 
-@router.post("", response_model=AddBookResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=AddBookResponse, response_model_exclude_none=True,
+    status_code=status.HTTP_201_CREATED,
+)
 def add_new_book(
     payload: AddBookRequest,
     settings: Settings = Depends(get_app_settings),

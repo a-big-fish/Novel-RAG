@@ -137,6 +137,38 @@ class LLMSceneSplitter:
                 start = index
         return accepted
 
+    def _judge_cross_chapter(self, previous_text: str, following_text: str) -> bool:
+        user_prompt = scene_prompt.build_cross_chapter_prompt(
+            previous_text, following_text,
+        )
+        prompt_version = f"{scene_prompt.PROMPT_VERSION}:cross_chapter"
+        input_hash = None
+        cached = None
+        if self.repository is not None:
+            input_hash = self.repository.scene_split_cache_key(
+                model=self.llm_client.model,
+                prompt_version=prompt_version,
+                input_text=user_prompt,
+            )
+            cached = self.repository.get_scene_split_cache(input_hash)
+        if cached is not None:
+            decision = CrossChapterDecision.model_validate(cached["output_json"])
+        else:
+            decision = self.llm_client.request_typed(
+                system_prompt=scene_prompt.CROSS_CHAPTER_SYSTEM_PROMPT,
+                user_prompt=user_prompt,
+                response_model=CrossChapterDecision,
+            )
+            if self.repository is not None and input_hash is not None:
+                self.repository.put_scene_split_cache(
+                    input_hash=input_hash,
+                    model=self.llm_client.model,
+                    prompt_version=prompt_version,
+                    input_text=user_prompt,
+                    output_json=decision.model_dump(),
+                )
+        return decision.same_scene
+
     def split(self, chapters: list[ChapterSlice]) -> list[SceneDraft]:
         budget = self.settings.max_llm_input_chars - 500
         if budget < 500:
@@ -196,14 +228,7 @@ class LLMSceneSplitter:
                     previous.chapter_end_index == chapter.chapter_index - 1
                     and len(combined) <= budget
                 ):
-                    decision = self.llm_client.request_typed(
-                        system_prompt=scene_prompt.CROSS_CHAPTER_SYSTEM_PROMPT,
-                        user_prompt=scene_prompt.build_cross_chapter_prompt(
-                            previous.text, following.text,
-                        ),
-                        response_model=CrossChapterDecision,
-                    )
-                    if decision.same_scene:
+                    if self._judge_cross_chapter(previous.text, following.text):
                         scenes[chapter_first_scene - 1] = replace(
                             previous,
                             chapter_end_index=following.chapter_end_index,

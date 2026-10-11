@@ -128,7 +128,6 @@ class OpenAICompatibleClient(JsonLLMClient):
             ],
             "temperature": 0.2,
         }
-        response: httpx.Response | None = None
         for attempt in range(self.max_retries + 1):
             try:
                 response = self.client.post(
@@ -137,7 +136,6 @@ class OpenAICompatibleClient(JsonLLMClient):
                     json=payload,
                 )
                 response.raise_for_status()
-                break
             except httpx.HTTPStatusError as exc:
                 status_code = exc.response.status_code
                 retryable = status_code in {408, 429} or status_code >= 500
@@ -146,19 +144,25 @@ class OpenAICompatibleClient(JsonLLMClient):
             except httpx.TransportError as exc:
                 if attempt >= self.max_retries:
                     raise StorageError(f"LLM request failed: {exc}") from exc
+            else:
+                try:
+                    body = response.json()
+                    content = body["choices"][0]["message"]["content"]
+                except (ValueError, KeyError, IndexError, TypeError) as exc:
+                    error = StorageError(f"LLM response parsing failed: {exc}")
+                else:
+                    if not isinstance(content, str) or not content.strip():
+                        error = StorageError("LLM returned a non-text response")
+                    else:
+                        try:
+                            return extract_json_object(content)
+                        except StorageError as exc:
+                            error = exc
+                if attempt >= self.max_retries:
+                    raise error
             if self.retry_backoff_seconds:
                 time.sleep(self.retry_backoff_seconds * (2**attempt))
-
-        if response is None:  # pragma: no cover - defensive invariant
-            raise StorageError("LLM request failed without a response")
-        try:
-            body = response.json()
-            content = body["choices"][0]["message"]["content"]
-        except Exception as exc:
-            raise StorageError(f"LLM response parsing failed: {exc}") from exc
-        if not isinstance(content, str):
-            raise StorageError("LLM returned a non-text response")
-        return extract_json_object(content)
+        raise StorageError("LLM request failed after retries")  # pragma: no cover
 
 
 class CodexExecClient(JsonLLMClient):

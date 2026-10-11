@@ -101,15 +101,8 @@ def test_upload_rejects_oversized_file(upload_client):
     assert list((root / "uploads").iterdir()) == []
 
 
-def test_duplicate_content_reuses_book_and_discards_second_upload(tmp_path: Path):
-    class DeduplicatingRepository(FakeRepository):
-        def register_book(self, **kwargs):
-            for book in self.books.values():
-                if book["source_sha256"] == kwargs["source_sha256"]:
-                    return book["id"], False
-            return super().register_book(**kwargs)
-
-    repository = DeduplicatingRepository()
+def test_duplicate_upload_requires_confirmation_before_new_version(tmp_path: Path):
+    repository = FakeRepository()
     settings = Settings(
         _env_file=None, book_source_dir=tmp_path,
         allowed_source_roots=str(tmp_path),
@@ -121,13 +114,63 @@ def test_duplicate_content_reuses_book_and_discards_second_upload(tmp_path: Path
         content = "# 第一章\n正文。".encode()
         first = client.post("/api/v1/books/upload", data={"title": "首次"}, files={"file": ("a.txt", content)})
         second = client.post("/api/v1/books/upload", data={"title": "重复"}, files={"file": ("a.md", content)})
+        confirmed = client.post(
+            "/api/v1/books/upload",
+            data={"title": "重复", "duplicate_action": "new_version", "duplicate_book_id": first.json()["book_id"]},
+            files={"file": ("a.md", content)},
+        )
     finally:
         app.dependency_overrides.clear()
-    assert first.status_code == second.status_code == 201
-    assert second.json()["created"] is False
-    assert second.json()["book_id"] == first.json()["book_id"]
+    assert first.status_code == 201
+    assert second.status_code == 409
+    assert second.json()["detail"] == {
+        "code": "duplicate_book", "book_id": first.json()["book_id"],
+        "title": "首次", "current_version": 0, "next_version": 1,
+    }
+    assert confirmed.status_code == 201
+    assert confirmed.json()["created"] is False
+    assert confirmed.json()["next_version"] == 1
     assert len(repository.books) == 1
     assert len(list((tmp_path / "uploads").iterdir())) == 1
+
+
+def test_same_title_new_file_updates_source_only_after_confirmation(upload_client):
+    client, repository, root = upload_client
+    first = client.post(
+        "/api/v1/books/upload", data={"title": "同一本书", "author": "甲"},
+        files={"file": ("book.txt", b"first version")},
+    )
+    book_id = first.json()["book_id"]
+    repository.books[book_id]["current_version"] = 1
+    repository.books[book_id]["status"] = "ready"
+    original_path = repository.books[book_id]["source_path"]
+    changed = {"file": ("book.txt", b"second version")}
+    duplicate = client.post(
+        "/api/v1/books/upload", data={"title": "同一本书", "author": "甲"},
+        files=changed,
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["detail"]["next_version"] == 2
+    assert repository.books[book_id]["source_path"] == original_path
+    stale_confirmation = client.post(
+        "/api/v1/books/upload",
+        data={"title": "同一本书", "author": "甲", "duplicate_action": "new_version", "duplicate_book_id": book_id + 1},
+        files=changed,
+    )
+    assert stale_confirmation.status_code == 409
+    assert repository.books[book_id]["source_path"] == original_path
+    confirmed = client.post(
+        "/api/v1/books/upload",
+        data={"title": "同一本书", "author": "甲", "duplicate_action": "new_version", "duplicate_book_id": book_id},
+        files=changed,
+    )
+    assert confirmed.status_code == 201
+    assert confirmed.json()["next_version"] == 2
+    assert repository.books[book_id]["current_version"] == 1
+    assert repository.books[book_id]["source_path"] != original_path
+    assert Path(repository.books[book_id]["source_path"]).read_bytes() == b"second version"
+    assert Path(original_path).read_bytes() == b"first version"
+    assert len(list((root / "uploads").iterdir())) == 2
 
 
 def test_uploaded_book_stays_pending_until_index_is_explicitly_started(upload_client):
