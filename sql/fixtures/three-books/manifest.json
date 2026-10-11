@@ -4,32 +4,32 @@
     {
       "id": 10,
       "title": "马之途",
-      "version": 2,
-      "scenes": 10,
-      "selected_points": 9,
-      "collection": "scenes_book_10_v2",
-      "file": "qdrant/scenes_book_10_v2.jsonl",
-      "sha256": "5342b42541de6954c90699be00d1034e1337a523eb979bdc4ae3721ccb1b3dd9"
+      "version": 3,
+      "scenes": 9,
+      "selected_points": 8,
+      "collection": "scenes_book_10_v3",
+      "file": "qdrant/scenes_book_10_v3.jsonl",
+      "sha256": "69670141a9079a5709d492318701ade9156d61b117f33ce0a93dcb817601e668"
     },
     {
       "id": 43,
       "title": "备用联系人",
-      "version": 1,
-      "scenes": 99,
-      "selected_points": 64,
-      "collection": "scenes_book_43_v1",
-      "file": "qdrant/scenes_book_43_v1.jsonl",
-      "sha256": "2c0ca327e7816d59f4e937d134d2b09809c4f1c5bd8d6d5f868876c5bab6c83a"
+      "version": 2,
+      "scenes": 88,
+      "selected_points": 54,
+      "collection": "scenes_book_43_v2",
+      "file": "qdrant/scenes_book_43_v2.jsonl",
+      "sha256": "e994b25527f5a75c939ddefb32e184f854a7f3053ade3fa53df911f0b1aab4ef"
     },
     {
       "id": 44,
       "title": "切勿操之过急",
-      "version": 1,
-      "scenes": 225,
-      "selected_points": 168,
-      "collection": "scenes_book_44_v1",
-      "file": "qdrant/scenes_book_44_v1.jsonl",
-      "sha256": "6d204baa99955f4ab653bc794edaca569610e562c2a01ed40ad7c8bc1d116360"
+      "version": 2,
+      "scenes": 129,
+      "selected_points": 89,
+      "collection": "scenes_book_44_v2",
+      "file": "qdrant/scenes_book_44_v2.jsonl",
+      "sha256": "9a471a03c29adddaf32cb27a9c719f2721b65576a00f1f6fdad5749935e68cec"
     }
   ],
   "excluded": [
@@ -42,12 +42,12 @@
   ],
   "postgres": {
     "file": "postgres.sql",
-    "sha256": "3e9d24d823bf812f6e4a8a09d1f7bbf7351787141e4fb35270a6769440435612",
+    "sha256": "c03cb47e57be65c84ad8434b3bc54b99e1f04ec1a155577e83b25e108d926add",
     "rows": {
       "books": 3,
-      "chapters": 234,
-      "scenes": 334,
-      "token_map": 20561,
+      "chapters": 245,
+      "scenes": 226,
+      "token_map": 22195,
       "tag_vocab": 53
     }
   }
