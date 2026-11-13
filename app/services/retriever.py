@@ -30,15 +30,25 @@ class PreparedQuery:
 
 
 def build_meta_query(parsed: dict[str, Any]) -> str:
+    """Build the meta-dense query from a plot anchor plus structured tags.
+
+    The 2026-11-13 diagnosis showed that a tag-only query sits near the centre
+    of the highly collapsed meta-dense space: target scenes landed outside the
+    top 5 for all sampled misses, while the raw intent alone ranked them first.
+    Keeping ``raw_intent`` as an anchor and appending canonical tags preserves
+    the plot signal while still steering style matching.
+    """
     fields = (
         ("场景类型", "scene_type"), ("写作技法", "technique"),
         ("文风", "style_tags"), ("情绪", "emotion_tags"),
         ("意象", "key_images"),
     )
-    return "\n".join(
+    raw = str(parsed.get("raw_intent") or "").strip()
+    tags = "\n".join(
         f"{label}：{'、'.join(parsed[key])}"
         for label, key in fields if parsed.get(key)
     )
+    return "\n".join(part for part in (raw, tags) if part)
 
 
 class Retriever:

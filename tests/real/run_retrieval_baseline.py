@@ -323,7 +323,7 @@ def _render_report(payload: dict[str, Any]) -> str:
         "# Novel-RAG 多书检索基线 · 2026-11-13",
         "",
         f"运行环境：PostgreSQL `{payload['database']}`、Qdrant `{payload['qdrant_url']}`。"
-        "覆盖当前就绪的四本书（含本地索引的《百年孤独》），共 "
+        "覆盖公开快照中的四本书（含《百年孤独》），共 "
         f"{summary['probe_count']} 条单书探针 + {summary['multi']['count']} 条多书聚合探针。",
         "",
         "## 覆盖书籍",
@@ -428,8 +428,9 @@ def _render_report(payload: dict[str, Any]) -> str:
         f"剧情摘要路由 {summary['route_hits']['summary_dense']}/{summary['probe_count']}，"
         f"原文语义 {summary['route_hits']['text_dense']}/{summary['probe_count']}。",
         f"- 最强路由为 {ROUTE_LABELS[strongest]}，最弱路由为 {ROUTE_LABELS[weakest]}"
-        f"（{summary['route_hits'][weakest]}/{summary['probe_count']}）。风格/技法向量的区分度"
-        "明显弱于剧情摘要与原文语义，适合作为补充路而不是主召回路。",
+        f"（{summary['route_hits'][weakest]}/{summary['probe_count']}）。"
+        f"风格与技法路由为 {summary['route_hits']['meta_dense']}/{summary['probe_count']}"
+        "（查询锚点修复前为 9/28），仍低于剧情摘要与原文语义。",
         f"- 解析降级 {summary['fallback_count']} 条、存在降级路由的探针 "
         f"{summary['degraded_probe_count']} 条，链路稳定性符合预期。",
         f"- 多书聚合 {summary['multi']['count']} 条查询全部成功，"
@@ -443,7 +444,7 @@ def _render_report(payload: dict[str, Any]) -> str:
         "",
         "- 探针按已知剧情位置人工指定目标 Scene，属于闭环可用性检查，不等同于开放域相关性评估。",
         "- 四路原始 score 不可跨向量空间比较，因此只统计 Hit@5 与 RRF 名次。",
-        "- 《百年孤独》仅存在于本地观察库，不随公开三书快照分发；复现需本地已有该索引。",
+        "- 《百年孤独》已包含在公开快照 `sql/fixtures/public-books/` 中；快照不含原始 EPUB/TXT。",
         "- 本轮不比较不同书籍的 RRF 分数，只观察聚合后的书籍覆盖与名次分布。",
         "",
         f"机器可读结果：`{RESULT_PATH.as_posix()}`。",

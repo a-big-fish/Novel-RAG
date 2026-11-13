@@ -4,7 +4,7 @@ import pytest
 
 from app.config import Settings
 from app.services.query_parser import ParsedQuery
-from app.services.retriever import Retriever, RetrievalError
+from app.services.retriever import Retriever, RetrievalError, build_meta_query
 
 
 class FakeRepository:
@@ -64,6 +64,18 @@ def test_retriever_keeps_four_routes_and_only_scene_preview():
     assert result["rrf"]["items"][0]["scene_id"] == 10
     assert len(result["rrf"]["items"][0]["text_preview"]) == 240
     assert "text_full" not in result["rrf"]["items"][0]
+
+
+def test_meta_query_keeps_plot_anchor_with_structured_tags():
+    text = build_meta_query({
+        "raw_intent": "雨夜追杀，冷峻短句",
+        "scene_type": ["action"], "technique": ["sensory_detail"],
+        "style_tags": ["restrained"], "emotion_tags": ["tension"],
+        "key_images": ["rain"],
+    })
+    assert text.startswith("雨夜追杀，冷峻短句")
+    assert "场景类型：action" in text
+    assert "文风：restrained" in text
 
 
 def test_empty_sparse_query_is_skipped_without_qdrant_request():
