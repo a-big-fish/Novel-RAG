@@ -88,4 +88,4 @@ def test_dashboard_is_served_without_static_export_dependency():
     response = TestClient(app).get("/dashboard")
     assert response.status_code == 200
     assert 'id="search-form"' in response.text
-    assert 'data.js' not in response.text
+    assert "const api='/api/v1'" in response.text
