@@ -1,5 +1,7 @@
 # 《马之途》单书检索基线 · 2026-09-29
 
+> **已归档。** 本报告只覆盖单书 10 条探针；多书规模化基线见 [`../retrieval-baseline-multi-book-2026-11-13.md`](../retrieval-baseline-multi-book-2026-11-13.md)。
+
 测试对象为隔离库 `novel-rag-test-2` 中的《马之途》v1：10 个 Scene，其中 9 个进入 Qdrant Reference Layer。运行 `uv run python -B -m tests.real.run_retrieval_baseline`，每路取 Top-5，RRF 取 Top-5。目标 Scene 按已知剧情位置人工指定，用来检查检索闭环，不作为跨书质量指标。
 
 | 写作需求（简写） | 目标 Scene | RRF 前五 Scene | 命中 |
