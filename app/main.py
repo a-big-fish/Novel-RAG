@@ -61,6 +61,6 @@ async def database_schema_error_handler(
     if getattr(exc.orig, "sqlstate", None) == "42P01":
         return JSONResponse(
             status_code=503,
-            content={"detail": "配置的 PostgreSQL 库缺少项目表。预览现有测试数据请运行 scripts/start_dashboard_preview.ps1；正式库需先完成迁移。"},
+            content={"detail": "配置的 PostgreSQL 库缺少项目表。默认库 novel-rag-test-2 应已完成迁移；新库请先运行 migrations 下的迁移脚本。"},
         )
     return JSONResponse(status_code=500, content={"detail": "PostgreSQL 查询失败"})

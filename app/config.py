@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = "development"
-    app_version: str = "0.8.0"
+    app_version: str = "0.9.0"
     api_prefix: str = "/api/v1"
 
     book_source_dir: Path = Path("data/books")
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     postgres_host: str = "127.0.0.1"
     postgres_port: int = 5432
-    postgres_db: str = "novel_rag"
+    postgres_db: str = "novel-rag-test-2"
     postgres_user: str = "rag"
     postgres_password: SecretStr = SecretStr("")
     postgres_test_db: str = "novel-rag-test-2"
