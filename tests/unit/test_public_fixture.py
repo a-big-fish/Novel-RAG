@@ -10,7 +10,7 @@ from scripts.restore_public_qdrant import restore
 
 
 def test_public_fixture_restores_searchable_vectors() -> None:
-    fixture_dir = Path(__file__).resolve().parents[2] / "sql" / "fixtures" / "three-books"
+    fixture_dir = Path(__file__).resolve().parents[2] / "sql" / "fixtures" / "public-books"
     manifest = json.loads((fixture_dir / "manifest.json").read_text(encoding="utf-8"))
     adapter = QdrantAdapter(client=QdrantClient(":memory:"))
     try:

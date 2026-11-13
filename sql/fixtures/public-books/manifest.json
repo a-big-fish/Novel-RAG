@@ -9,7 +9,7 @@
       "selected_points": 8,
       "collection": "scenes_book_10_v3",
       "file": "qdrant/scenes_book_10_v3.jsonl",
-      "sha256": "69670141a9079a5709d492318701ade9156d61b117f33ce0a93dcb817601e668"
+      "sha256": "b8c1c19cf728dfdc27eb4cb88cdeb3ba0b0340a81183022ff3cb33eb3c8ab5ea"
     },
     {
       "id": 43,
@@ -19,7 +19,7 @@
       "selected_points": 54,
       "collection": "scenes_book_43_v2",
       "file": "qdrant/scenes_book_43_v2.jsonl",
-      "sha256": "e994b25527f5a75c939ddefb32e184f854a7f3053ade3fa53df911f0b1aab4ef"
+      "sha256": "151b85aa55a39bcd827964ada9a1e25555cb1c8dc5cff110f4e4da395192a795"
     },
     {
       "id": 44,
@@ -29,7 +29,17 @@
       "selected_points": 89,
       "collection": "scenes_book_44_v2",
       "file": "qdrant/scenes_book_44_v2.jsonl",
-      "sha256": "9a471a03c29adddaf32cb27a9c719f2721b65576a00f1f6fdad5749935e68cec"
+      "sha256": "226b54664f044ecc4f88768d3dff6020a8342fd8440d5b7625c3a4117d3de823"
+    },
+    {
+      "id": 86,
+      "title": "百年孤独",
+      "version": 3,
+      "scenes": 113,
+      "selected_points": 109,
+      "collection": "scenes_book_86_v3",
+      "file": "qdrant/scenes_book_86_v3.jsonl",
+      "sha256": "cb7b13ec5840606e37c3d34b5f4c836f81eb35be232e3aa247fbbde13443b31f"
     }
   ],
   "excluded": [
@@ -42,12 +52,12 @@
   ],
   "postgres": {
     "file": "postgres.sql",
-    "sha256": "c03cb47e57be65c84ad8434b3bc54b99e1f04ec1a155577e83b25e108d926add",
+    "sha256": "fae367bbf3b73e10a646637a0638ba41120e4bfded55971316bb142ed7853930",
     "rows": {
-      "books": 3,
-      "chapters": 245,
-      "scenes": 226,
-      "token_map": 22195,
+      "books": 4,
+      "chapters": 265,
+      "scenes": 339,
+      "token_map": 38853,
       "tag_vocab": 53
     }
   }

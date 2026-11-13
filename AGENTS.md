@@ -4,7 +4,7 @@
 
 `Novel-RAG` is a Python 3.11 FastAPI service for the novel-writing RAG ingestion and retrieval pipeline. Application code lives in `app/`: `api/` for routes, `clients/` for LLM/Ollama adapters, `db/` for PostgreSQL and Qdrant, `services/` for pipeline stages, `prompts/` for versioned prompts, and `utils/` for EPUB conversion and text handling.
 
-Maintain all PostgreSQL create statements in `./sql/` (for example `sql/03_scenes.sql`) and mirror applied changes in `migrations/`. Qdrant collection layout is defined by `app/db/qdrant.py` and the public fixture under `sql/fixtures/three-books/`. `tests/unit/`, `tests/integration/`, `tests/fixtures/`, and `tests/real/` mirror the application domains; local generated books and converted files belong under `data/`. Current PRDs live in `docs/prd/` (archived versions under `docs/prd/archive/`), and retrieval baselines live in `reports/`.
+Maintain all PostgreSQL create statements in `./sql/` (for example `sql/03_scenes.sql`) and mirror applied changes in `migrations/`. Qdrant collection layout is defined by `app/db/qdrant.py` and the public fixture under `sql/fixtures/public-books/`. `tests/unit/`, `tests/integration/`, `tests/fixtures/`, and `tests/real/` mirror the application domains; local generated books and converted files belong under `data/`. Current PRDs live in `docs/prd/` (archived versions under `docs/prd/archive/`), and retrieval baselines live in `reports/`.
 
 ## Build, Test, and Development Commands
 
