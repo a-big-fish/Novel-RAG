@@ -4,6 +4,8 @@
 
 **Novel-RAG** 是小说创作项目 **novel-creator** 的基础能力之一，也可以独立部署为小说理解与写作范本检索服务。
 
+当前版本：**0.9.0**。最新方案见 [`docs/prd/novel-rag-prd-v0.9.md`](docs/prd/novel-rag-prd-v0.9.md)；v0.8 已归档。
+
 ## 愿景
 
 我们希望解决的核心问题是：**如何让 AI 真正读懂一本小说中值得学习的部分。**
@@ -19,7 +21,7 @@
 
 系统保留完整的 Scene 资产，并筛选值得参考的场景。当创作系统提出“需要人物关系紧张、对白带有试探感、逐步暴露信息的场景”时，它应能找到**适合这个任务的 Scene，并说明参考价值**。
 
-项目的目标是在原始小说与 AI 创作系统之间建立 **Writing Reference Layer（写作范本层）**。它不直接生成小说正文；除了 `novel-creator`，其他 Agent、研究工具或个人知识库也能通过 HTTP API 使用它。长期方向是一套通用的 **Novel Understanding & Writing Reference Engine**：让机器理解 **这一段为什么有效，以及什么时候值得这样写。**
+项目的目标是在原始小说与 AI 创作系统之间建立 **Writing Reference Layer（写作范本层）**。它不直接生成小说正文；除了 `novel-creator`，其他 Agent、研究工具或个人知识库也能使用它。服务以**云服务（HTTP）**或 **stdio MCP** 两种形态交付，对外既可返回**待拼接的结构化素材**，也可返回**拼接完成的提示词**。**多书聚合是最高层抽象接口**；单书检索作为聚合器的内部构件保留。长期方向是一套通用的 **Novel Understanding & Writing Reference Engine**：让机器理解 **这一段为什么有效，以及什么时候值得这样写。**
 
 ## 当前能力
 
@@ -29,10 +31,17 @@
 | 拆解 | EPUB 按阅读顺序提取正文并保留章节边界；LLM 粗读有界段落窗口后切分 Scene，保留全部原文。 |
 | 判断与标注 | 场景切分完成后，先用全书重复证据与 LLM 筛除垃圾、近重复片段，再评估写作参考价值；仅对入选 Scene 做深度结构化标注。 |
 | 索引 | PostgreSQL 保存全部场景与标注；Qdrant 为入选场景保存三路稠密向量及一路稀疏向量。 |
-| 检索 | 自然语言需求解析、四路召回、书内无权重 RRF、多书并发聚合、可选 Ollama 重排。 |
+| 检索 | 自然语言需求解析、四路召回、书内无权重 RRF、多书并发聚合（最高层接口）、可选 Ollama 重排。 |
+| 交付 | 云服务 HTTP + stdio MCP；`fragments`（待拼接素材）与 `prompt`（拼接完成提示词）两种输出契约。 |
 | 观察 | Dashboard 展示导入与检索阶段、耗时、错误、解析 JSON、候选排序和完整 Scene 回查。 |
 
-`archived` 表示有效场景未入选写作范本；`discarded` 表示质量全筛剔除的垃圾或近重复片段。两者的原文都保存在 PostgreSQL，均不进入 Qdrant。多书检索只做一次查询解析与向量化，再并发检索各书；全局重排失败时保留聚合结果。个人素材库、写作质量标注与上下文组装仍在规划中。
+`archived` 表示有效场景未入选写作范本；`discarded` 表示质量全筛剔除的垃圾或近重复片段。两者的原文都保存在 PostgreSQL，均不进入 Qdrant。多书检索只做一次查询解析与向量化，再并发检索各书；全局重排失败时保留聚合结果。个人素材库与写作质量标注仍在规划中；上下文拼接契约已在 v0.9 PRD 中确定，代码实现排入后续里程碑。
+
+## 交付形态
+
+- **云服务（HTTP）**：现有接口已可用，包括多书聚合 `POST /api/v1/search/multi`。公网部署前需补鉴权与租户隔离。
+- **stdio MCP**：计划实现 `search_references`、`get_scene`、`build_reference_prompt` 等 tools，与 HTTP 共享同一领域契约。
+- **两种输出**：`fragments` 返回结构化素材与引用信息，由调用方拼接；`prompt` 由服务端按预算和模板拼接完成。两者都返回可追溯的引用表与预算报告。
 
 ## 界面预览
 
@@ -115,6 +124,8 @@ Rerank 仅在检索时按配置执行；未开启时直接返回聚合排序结�
 - 可调用的 LLM：在 `.env` 配置 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL`，或配置 `codex_exec` 适配器。
 - 首次启动会下载 Embedding 模型；开启重排时还会下载 Reranker。模型下载和推理需要足够的磁盘、内存与算力，CPU 可运行但会较慢。
 - 当前 API 没有用户认证。Compose 默认只将服务端口绑定到 `127.0.0.1`；对公网开放前须自行加访问控制。
+- 本机默认数据库为观察库 `novel-rag-test-2`（含多书观察数据）；生产部署请使用独立数据库并在迁移后导入或重新索引书籍。
+- stdio MCP 交付形态为 v0.9 契约，尚未随代码发布；当前对外入口为 HTTP API。
 
 ### Docker Compose 启动
 
@@ -143,7 +154,7 @@ uv run python -m app.db.migrate migrations/006_scene_quality_screen.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-`POSTGRES_DB` 指向需要初始化的数据库。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
+`POSTGRES_DB` 指向需要初始化的数据库；本机默认使用观察库 `novel-rag-test-2`，其中包含多书观察数据与本地索引的《百年孤独》。`POSTGRES_TEST_DB` 默认与该库一致；生产或 CI 建议另建独立库。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
 
 场景边界判断会按模型、提示词版本与输入内容缓存到 PostgreSQL；长篇索引中断后可复用已完成窗口。`SCENE_MIN_CHARS` 控制接受模型边界的最小场景长度。升级旧版本后，已有书籍需重新索引才能采用新的 EPUB 章节与场景切分结果。
 
@@ -164,6 +175,21 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 `postgres.sql` 包含书籍登记、章节全文、Scene 原文与标注、标签词表和稀疏词映射；`qdrant/*.jsonl` 包含对应向量和场景元数据。`manifest.json` 记录版本、行数、点数及 SHA-256。**原始 EPUB/TXT 未包含在快照中**；恢复后可以检索、浏览，若要重新索引请通过 Dashboard 重新上传原文件。
 
 快照不包含 API 密钥、查询历史、模型输入缓存、Embedding 缓存或索引任务日志。本机 `source_path` 已替换为占位路径。不要把个人数据库直接 `pg_dump` 后提交到公开仓库。
+
+本地观察库还包含未公开分发的《百年孤独》v3（book_id 86，113 个 Scene、109 个入选参考），用于更真实的多书检索与观察演示；它不在三书快照内，复现需本地已有该索引。
+
+### 检索质量基线
+
+- 多书规模化基线（含《百年孤独》，4 本书、28 条单书探针 + 4 条多书聚合探针）：[`reports/retrieval-baseline-multi-book-2026-11-13.md`](reports/retrieval-baseline-multi-book-2026-11-13.md)。单书 RRF Hit@5 为 27/28；多书聚合 4/4 查询成功并覆盖全部书单书籍，平均约 4.9 s；解析降级 0。
+- 早期单书基线（《马之途》10 条探针）：[`reports/archive/retrieval-baseline-ma-zhitu-2026-09-29.md`](reports/archive/retrieval-baseline-ma-zhitu-2026-09-29.md)。
+
+风格与技法路由在基线中明显弱于剧情摘要与原文语义（9/28 对 28/28），适合保留为补充路。可选重排在 5 条候选上耗时约 139 s，暂不适合同步交互链路。
+
+复现：
+
+```bash
+uv run python -B -m tests.real.run_retrieval_baseline
+```
 
 在全新 Compose 数据卷中启动并完成迁移后导入：
 
@@ -198,8 +224,9 @@ uv run python -m scripts.export_public_fixture --book-ids 10 43 44 --database no
 | --- | --- |
 | 书籍登记与索引 | `POST /books/upload`、`GET /books`、`POST /books/{book_id}/index`、`GET /books/{book_id}/jobs` |
 | 版本与场景 | `GET /books/{book_id}/versions`、`GET /books/{book_id}/versions/{version}/scenes`、`GET /scenes/{scene_id}` |
-| 单书检索 | `POST /books/{book_id}/search`、`POST /books/{book_id}/search/stream` |
-| 多书检索 | `POST /search/multi`、`POST /search/multi/stream` |
+| 单书检索（内部构件） | `POST /books/{book_id}/search`、`POST /books/{book_id}/search/stream` |
+| **多书聚合（主接口）** | `POST /search/multi`、`POST /search/multi/stream` |
+| 上下文组装（契约） | `POST /assemble` |
 | 组件调试 | `POST /qdrant/collections/{collection}/points/search`、`GET /qdrant/collections/{collection}/points/{point_id}` |
 
 两个 `/stream` 接口返回 NDJSON：`progress` 表示阶段进度，`result.data` 是最终结果，`error.message` 表示失败。完整的 Scene 原文通过数据库详情接口回查；RRF 候选仅携带 `scene_id` 与限长预览。
@@ -219,14 +246,16 @@ uv run pytest tests/integration -q -m integration
 
 ```text
 app/                    FastAPI、LLM/Ollama 客户端、索引与检索服务
-app/prompts/            切分、判断、深度标注、需求解析与重排提示词
+app/prompts/            切分、质量全筛、判断、深度标注、需求解析与重排提示词
 dashboard/              导入、索引进度和检索实验界面
+docs/prd/               当前 PRD v0.9 与归档的历史版本
 images/                 README 展示用的界面截图
 migrations/             PostgreSQL 迁移历史
+reports/                检索质量基线报告与归档
 sql/fixtures/three-books/
                         PostgreSQL 数据 SQL、Qdrant JSONL、校验清单
-scripts/                测试库导出、Qdrant 恢复、本地预览脚本
-tests/                  单元、集成、手工真实链路测试
+scripts/                测试库导出与 Qdrant 恢复脚本
+tests/                  单元、集成、手工真实链路与基线脚本
 data/                   本地上传与转换缓存，不进入 Git
 compose.yaml            PostgreSQL、Qdrant、Ollama 与应用编排
 Dockerfile              应用镜像
