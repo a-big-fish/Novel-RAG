@@ -117,7 +117,8 @@ MCP 是交付重点，核心设计是：**调用方不需要会拼检索查询**
 | `plan_writing_query` | 只预览由写作目标生成的检索查询，不检索 | 已实现 |
 | `build_reference_prompt` | 进阶：直接给检索 query，返回拼装结果 | 已实现 |
 | `get_scene` | 按 book_id/version/scene_id 回查原文与标注 | 已实现 |
-| `list_books` | 列出书籍与当前版本 | 已实现 |
+| `list_books` | 列出书籍与当前版本（返回 `{count, books}`） | 已实现 |
+| `get_service_status` | 检查 PostgreSQL / Qdrant / Ollama / LLM 配置与 ready 书籍数 | 已实现 |
 | `get_usage_guide` | 返回"如何向本服务提问"的完整说明 | 已实现 |
 
 同时暴露：
@@ -125,6 +126,9 @@ MCP 是交付重点，核心设计是：**调用方不需要会拼检索查询**
 - MCP prompt：`writing_reference_brief(writing_goal)`，给调用方一段现成的调用指导；
 - MCP resource：`novel-rag://usage-guide`，与 `get_usage_guide` 同内容；
 - 配置文件级 skill：[`skills/novel-rag-writing/SKILL.md`](../../skills/novel-rag-writing/SKILL.md)。
+- 项目以 hatchling 打包，`uv sync` 会安装 `novel-rag-mcp` 入口；第三方客户端的 `mcpServers`
+  配置示例见 README「第三方 AI 接入」。
+- 预期错误统一转为 MCP `is_error=true` 的可读消息（`ToolError`），不会只暴露 SDK 的通用失败。
 
 不变量：
 

@@ -48,7 +48,7 @@
 
 ```bash
 uv run python -m app.mcp_server
-# 或安装入口后
+# 项目已打包，入口点安装后也可用
 uv run novel-rag-mcp
 ```
 
@@ -63,11 +63,58 @@ uv run novel-rag-mcp
 | `build_reference_prompt` | 进阶：直接给检索 query，返回拼装结果 |
 | `get_scene` | 按 `book_id` / `version` / `scene_id` 回查原文与标注 |
 | `list_books` | 列出书籍与当前版本 |
+| `get_service_status` | 检查 PostgreSQL、Qdrant、Ollama、LLM 是否就绪 |
 | `get_usage_guide` | 返回“如何向本服务提问”的完整说明 |
 
 同一份说明以三种形式提供：MCP 工具 `get_usage_guide`、MCP 资源 `novel-rag://usage-guide`，
 以及可安装的 skill：[`skills/novel-rag-writing/SKILL.md`](skills/novel-rag-writing/SKILL.md)。
 MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 6000，可通过 `budget_chars` 调整。
+
+### 第三方 AI 接入
+
+前置条件：
+
+1. `.env` 已配置 PostgreSQL、Qdrant、Ollama 与可用的 LLM，并执行迁移
+   `007_index_job_queue.sql`；至少有一本书索引到 `ready`（可用 `list_books` 或
+   `get_service_status` 检查）。
+2. 本机有 `uv`，或直接使用仓库的 `.venv`。
+3. MCP 走 stdio，由客户端进程拉起，不需要公网端口，也没有额外鉴权；跨机使用需要远程
+   MCP 桥接或隧道（以后可能的实现）。
+
+客户端配置示例（Claude Desktop / Cursor 等通用 `mcpServers` 结构，路径按实际修改）：
+
+```json
+{
+  "mcpServers": {
+    "novel-rag": {
+      "command": "uv",
+      "args": ["run", "--project", "E:/novels/novel-rag", "novel-rag-mcp"]
+    }
+  }
+}
+```
+
+或固定解释器启动：
+
+```json
+{
+  "mcpServers": {
+    "novel-rag": {
+      "command": "E:/novels/novel-rag/.venv/Scripts/python.exe",
+      "args": ["-m", "app.mcp_server"],
+      "env": {
+        "PYTHONPATH": "E:/novels/novel-rag",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
+```
+
+接入后建议先让 AI 调 `get_service_status` 确认依赖，再调用 `search_writing_references`。
+首次未命中的查询会调用外部 LLM 做需求解析，可能耗时数十秒到数分钟；解析结果有持久缓存，
+同一查询再次调用会明显更快，客户端工具超时应设置得宽裕。已知错误会通过 MCP
+`is_error=true` 与可读消息返回，不会只显示“执行失败”。
 
 ## 界面预览
 
