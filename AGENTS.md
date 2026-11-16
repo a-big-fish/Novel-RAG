@@ -4,7 +4,9 @@
 
 `Novel-RAG` is a Python 3.11 FastAPI service for the novel-writing RAG ingestion and retrieval pipeline. Application code lives in `app/`: `api/` for routes, `clients/` for LLM/Ollama adapters, `db/` for PostgreSQL and Qdrant, `services/` for pipeline stages, `prompts/` for versioned prompts, and `utils/` for EPUB conversion and text handling.
 
-Maintain all PostgreSQL create statements in `./sql/` (for example `sql/03_scenes.sql`) and mirror applied changes in `migrations/`. Qdrant collection layout is defined by `app/db/qdrant.py` and the public fixture under `sql/fixtures/public-books/`. `tests/unit/`, `tests/integration/`, `tests/fixtures/`, and `tests/real/` mirror the application domains; local generated books and converted files belong under `data/`. Current PRDs live in `docs/prd/` (archived versions under `docs/prd/archive/`), and retrieval baselines live in `reports/`.
+Maintain all PostgreSQL create statements in `./sql/` (for example `sql/03_scenes.sql`) and mirror applied changes in `migrations/`. Qdrant collection layout is defined by `app/db/qdrant.py` and the public fixture under `sql/fixtures/public-books/`. `tests/unit/`, `tests/integration/`, `tests/fixtures/`, and `tests/real/` mirror the application domains; local generated books and converted files belong under `data/`. Current PRDs live in `docs/prd/` (archived versions under `docs/prd/archive/`), retrieval baselines live in `reports/`, and installable agent skills live in `skills/`.
+
+The stdio MCP surface lives in `app/mcp_server.py` and must stay aligned with the HTTP `/assemble` flow: both call `WritingReferenceService` and share `app/mcp_guide.py` / `skills/novel-rag-writing/SKILL.md`.
 
 ## Build, Test, and Development Commands
 
@@ -17,6 +19,7 @@ uv run python -m app.db.migrate migrations/004_query_parsing_cache.sql
 uv run python -m app.db.migrate migrations/005_scene_split_cache.sql
 uv run python -m app.db.migrate migrations/006_scene_quality_screen.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+uv run python -m app.mcp_server
 uv run pytest tests/unit -q
 uv run pytest tests/integration -q -m integration
 uv run python -B -m tests.real.run_retrieval_baseline

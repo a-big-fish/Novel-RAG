@@ -98,29 +98,79 @@
 - 新增契约（本版定义，随 M1 实现）：`POST /api/v1/assemble`、`GET /api/v1/book-sets`（可选）。
 - 稳定性：所有检索接口无副作用；失败返回结构化错误，不返回伪造的空成功结果。
 
-### 4.3 stdio MCP（交付重点，工具形态待定）
+### 4.3 stdio MCP（已实现第一版）
 
-MCP 是最终数据交付形式的实现重点，但**具体工具集合与调用粒度尚未定型**，本文只固定以下不变量：
+启动：
+
+```bash
+uv run python -m app.mcp_server      # 或 uv run novel-rag-mcp
+```
+
+MCP 是交付重点，核心设计是：**调用方不需要会拼检索查询**。调用方只说"想写什么"，
+服务端负责查询规划、多书检索与提示词组装。
+
+已实现工具：
+
+| tool | 作用 | 状态 |
+| --- | --- | --- |
+| `search_writing_references` | **主入口**：writing_goal + 细纲/约束 → 查询规划 → 多书检索 → 拼装 prompt 或 fragments | 已实现 |
+| `plan_writing_query` | 只预览由写作目标生成的检索查询，不检索 | 已实现 |
+| `build_reference_prompt` | 进阶：直接给检索 query，返回拼装结果 | 已实现 |
+| `get_scene` | 按 book_id/version/scene_id 回查原文与标注 | 已实现 |
+| `list_books` | 列出书籍与当前版本 | 已实现 |
+| `get_usage_guide` | 返回"如何向本服务提问"的完整说明 | 已实现 |
+
+同时暴露：
+
+- MCP prompt：`writing_reference_brief(writing_goal)`，给调用方一段现成的调用指导；
+- MCP resource：`novel-rag://usage-guide`，与 `get_usage_guide` 同内容；
+- 配置文件级 skill：[`skills/novel-rag-writing/SKILL.md`](../../skills/novel-rag-writing/SKILL.md)。
+
+不变量：
 
 - 以 stdio 启动，随调用方进程生命周期，不额外监听端口。
 - 与 HTTP 共享同一检索/组装领域层与响应结构，不直连数据库以外的新存储。
-- 默认只读：不触发索引、不修改 Scene；需要写操作时另立显式工具。
+- 默认只读：不触发索引、不修改 Scene。
+- 默认不重排；`use_rerank=true` 才进入分钟级重排。
 - 超长 Scene 一律有界采样，不把整本书塞进 tool 结果。
-- 长任务通过 MCP progress notification 汇报阶段，映射流式接口的 `progress` 事件。
 
-草案工具集（可能合并或拆分，M2 冻结）：
+### 4.4 调用方 A 如何发起请求（组装 skill）
 
-| tool | 输入要点 | 输出 | 状态 |
-| --- | --- | --- | --- |
-| `list_books` | 状态过滤 | 可检索书籍与当前版本 | 草案 |
-| `search_references` | query、book_ids、per_book_limit、global_limit | 与 `/search/multi` 同构的 fragments | 草案 |
-| `get_scene` | book_id、version、scene_id | Scene 原文与标注 | 草案 |
-| `build_reference_prompt` | query、book_ids、预算、模板、风格约束 | 拼接完成的提示词与引用表 | 草案 |
-| `get_index_status` | book_id | 索引阶段与失败原因 | 草案 |
+背景：写作 Agent 通常只知道由细纲推出的"想写什么样的段落"，并不知道如何拆标签或构造检索 query。为此提供三层入口：
 
-实现顺序上**先完成组装层（prompt 可用），再包 MCP**，避免在交付形态未定时提前固化接口。
+1. **最简（推荐）**：只传 `writing_goal` + `outline_context` + `constraints`，调用
+   `search_writing_references`。工具内部用 `plan_writing_query` 生成查询，
+   再用多书聚合与组装层返回 `prompt.text`。
+2. **预览/调试**：先用 `plan_writing_query` 看服务端会用什么查询，不消耗检索；
+   确认后再调用主入口。
+3. **进阶**：已有结构化 query 的调用方用 `build_reference_prompt`，或直接用
+   HTTP `/api/v1/assemble`。
 
-### 4.4 两种输出格式
+组装 skill 的职责是告诉 A：
+
+- 什么时候调用、参数怎么填（目标、细纲上下文、约束）；
+- 三个层级的入口怎么选；
+- 返回值怎么用（`prompt.text` 直接进写作模型；`references` 用于回查与引用）；
+- 失败/空结果怎么处理（把目标写具体，而不是换标签）；
+- 不要做什么（不要自己拼标签、不要要求整本书、不要默认开重排）。
+
+调用示例（MCP tool arguments）：
+
+```json
+{
+  "writing_goal": "写一段雨夜追杀的紧张场景，冷峻短句，结尾留一个反转",
+  "outline_context": "主角刚发现盟友背叛，追兵封锁街道",
+  "constraints": {"情绪": "紧张", "句式": "短句", "视角": "第三人称限知"},
+  "output": "prompt",
+  "budget_chars": 6000,
+  "max_scenes": 6
+}
+```
+
+服务端返回：`query_plan`（实际使用的查询）、`search`（逐书状态/耗时/降级）、
+`prompt`（文本 + 预算）、`references`（引用表）、`dropped`（预算/上限舍弃项）。
+
+### 4.5 两种输出格式
 
 | 取值 | 含义 | 定位 |
 | --- | --- | --- |
@@ -239,7 +289,7 @@ POST /api/v1/search/multi/stream
 
 ## 六、上下文拼接与提示词组装契约
 
-本章是 v0.9 新增的**对外契约**，实现排期见第十四章（M1）。目标：让调用方不必理解 Scene 切分与四路检索细节，也能拿到可用的写作参考上下文。
+本章是 v0.9 新增的**对外契约**，已随 M1 落地（`app/services/assembler.py`、`app/prompts/assembly/v1.py`、`POST /api/v1/assemble`、MCP `search_writing_references`）。目标：让调用方不必理解 Scene 切分与四路检索细节，也能拿到可用的写作参考上下文。
 
 ### 6.1 组装输入
 
@@ -406,9 +456,9 @@ meta 查询的构造在 2026-11-13 修复为 **`raw_intent` 锚点 + canonical �
 | Scene 直查 | `GET /api/v1/scenes/{scene_id}` | 已实现 |
 | 单书检索 | `POST /api/v1/books/{book_id}/search`、`POST /api/v1/books/{book_id}/search/stream` | 已实现（内部构件） |
 | **多书聚合（主接口）** | `POST /api/v1/search/multi`、`POST /api/v1/search/multi/stream` | 已实现 |
-| 上下文组装 | `POST /api/v1/assemble` | 契约已定 |
+| 写作参考组装 | `POST /api/v1/assemble` | 已实现 |
 | Qdrant 直查 | `POST /api/v1/qdrant/collections/{collection}/points/search`、`GET .../points/{point_id}` | 已实现 |
-| MCP tools | `list_books`、`search_references`、`get_scene`、`build_reference_prompt`、`get_index_status` | 契约已定 |
+| MCP tools | `search_writing_references`、`plan_writing_query`、`build_reference_prompt`、`get_scene`、`list_books`、`get_usage_guide` | 已实现（stdio） |
 
 请求/响应细节以运行中的 `/openapi.json` 与 `/docs` 为准。
 
@@ -503,10 +553,10 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 | E | 场景质量全筛、上传与版本化重传 | 已完成 |
 | F | 多书聚合顶层接口 + 重排开关 | 已完成 |
 | G | 多书规模化基线 + meta 路由诊断 | 已完成 |
-| **H（M1，当前）** | **组装层 `/assemble` 与 `build_reference_prompt`：让"拼接完成的提示词"正式可用** | 进行中 |
-| I（M2） | stdio MCP：组装契约冻结后包一层，工具集合待定 | 下一步 |
+| **H（M1）** | **组装层 `/assemble` 与 `build_reference_prompt`：让"拼接完成的提示词"正式可用** | 已完成 |
+| **I（M2）** | **stdio MCP：以写作目标为主入口，附组装 skill 与使用说明** | 已完成第一版 |
 | J（M3） | 长任务可靠性：索引 worker/守护进程、断点续跑、重试看门狗；重排缓存与异步化 | 待开始 |
-| K（M4） | meta 标注与词表整改、路由形态评估，并回归多书基线 | 待开始 |
+| K（M4） | meta 标注与词表整改、路由形态评估，并回归多书基线 | 进行中（本次重建 meta 向量） |
 | L（M5） | 四书公开快照 | 本版完成导出 |
 | M | 云服务器 / 托管云形态 | 未来，暂不启动（当前用本机 + Cloudflare Tunnel） |
 | N | 个人摘抄库、写作质量标注 | 未来，不着急 |

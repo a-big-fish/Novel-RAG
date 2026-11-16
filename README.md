@@ -41,8 +41,33 @@
 
 - **本机 + Cloudflare Tunnel（当前）**：HTTP 接口已可用，包括多书聚合 `POST /api/v1/search/multi`；隧道前必须补访问控制。
 - **云服务器 / 托管云（以后可能的实现）**：领域契约与网络形态解耦，迁移时预计只需补持久化部署与网关鉴权。
-- **stdio MCP（实现重点，形态待定）**：计划包含 `search_references`、`get_scene`、`build_reference_prompt` 等 tools，与 HTTP 共享领域契约。
+- **stdio MCP（已实现第一版）**：调用方只需给出写作目标，服务端完成查询规划、检索与提示词拼装；工具与说明见下节。
 - **两种输出**：`fragments` 返回结构化素材与引用信息，由调用方拼接；`prompt` 由服务端按预算和模板拼接完成，是当前实现目标。两者都返回可追溯的引用表与预算报告。
+
+## MCP 服务
+
+```bash
+uv run python -m app.mcp_server
+# 或安装入口后
+uv run novel-rag-mcp
+```
+
+调用方（写作 Agent）通常只知道“想写什么样的段落”，不知道如何拼检索查询。MCP 的主工具
+`search_writing_references` 接收写作目标、细纲上下文与约束，内部完成查询规划、多书检索、
+去重/截断/预算拼装，返回可直接使用的 `prompt.text` 或结构化 `fragments`。
+
+| 工具 | 作用 |
+| --- | --- |
+| `search_writing_references` | 主入口：写作目标 + 细纲/约束 → 提示词或 fragments |
+| `plan_writing_query` | 只预览生成的检索查询，不执行检索 |
+| `build_reference_prompt` | 进阶：直接给检索 query，返回拼装结果 |
+| `get_scene` | 按 `book_id` / `version` / `scene_id` 回查原文与标注 |
+| `list_books` | 列出书籍与当前版本 |
+| `get_usage_guide` | 返回“如何向本服务提问”的完整说明 |
+
+同一份说明以三种形式提供：MCP 工具 `get_usage_guide`、MCP 资源 `novel-rag://usage-guide`，
+以及可安装的 skill：[`skills/novel-rag-writing/SKILL.md`](skills/novel-rag-writing/SKILL.md)。
+MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 6000，可通过 `budget_chars` 调整。
 
 ## 界面预览
 
@@ -228,7 +253,7 @@ uv run python -m scripts.export_public_fixture --book-ids 10 43 44 86 --database
 | 版本与场景 | `GET /books/{book_id}/versions`、`GET /books/{book_id}/versions/{version}/scenes`、`GET /scenes/{scene_id}` |
 | 单书检索（内部构件） | `POST /books/{book_id}/search`、`POST /books/{book_id}/search/stream` |
 | **多书聚合（主接口）** | `POST /search/multi`、`POST /search/multi/stream` |
-| 上下文组装（契约） | `POST /assemble` |
+| 写作参考组装 | `POST /assemble` |
 | 组件调试 | `POST /qdrant/collections/{collection}/points/search`、`GET /qdrant/collections/{collection}/points/{point_id}` |
 
 两个 `/stream` 接口返回 NDJSON：`progress` 表示阶段进度，`result.data` 是最终结果，`error.message` 表示失败。完整的 Scene 原文通过数据库详情接口回查；RRF 候选仅携带 `scene_id` 与限长预览。
@@ -248,7 +273,9 @@ uv run pytest tests/integration -q -m integration
 
 ```text
 app/                    FastAPI、LLM/Ollama 客户端、索引与检索服务
-app/prompts/            切分、质量全筛、判断、深度标注、需求解析与重排提示词
+app/mcp_server.py       stdio MCP 服务（写作参考主入口）
+app/prompts/            切分、质量全筛、判断、深度标注、需求解析、重排与组装提示词
+skills/                 可安装的 Agent skill（含 Novel-RAG 组装 skill）
 dashboard/              导入、索引进度和检索实验界面
 docs/prd/               当前 PRD v0.9 与归档的历史版本
 images/                 README 展示用的界面截图
