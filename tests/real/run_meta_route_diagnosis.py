@@ -290,47 +290,71 @@ def _render(payload: dict[str, Any]) -> str:
     ]
     for name, count in summary["variant_target_top5"].items():
         lines.append(f"| {labels.get(name, name)} | {count}/{summary['probe_count']} |")
+    rebuild: dict[str, Any] = {}
+    rebuild_path = Path("data/converted/meta-rebuild-2026-11-16.json")
+    if rebuild_path.exists():
+        rebuild = json.loads(rebuild_path.read_text(encoding="utf-8")).get("books", {})
+    baseline: dict[str, Any] = {}
+    baseline_path = Path("data/converted/retrieval-baseline-multi-book.json")
+    if baseline_path.exists():
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8")).get("summary", {})
+    hits = summary["variant_target_top5"]
     lines += [
-        "",
-        f"查询标签与目标场景标签的平均 Jaccard 重合度：**{summary['mean_tag_overlap']:.2f}**。",
         "",
         "### 2.3 向量空间塌缩程度（书内两两余弦）",
         "",
-        "| 书籍 | Scene | text-dense 均余弦 | meta-dense 均余弦 | summary-dense 均余弦 |",
-        "| --- | ---: | ---: | ---: | ---: |",
+        "| 书籍 | Scene | meta 重建前 | meta 重建后 | text-dense | summary-dense |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for book_id, data in summary["collapse"].items():
         def cell(name: str) -> str:
             item = data.get(name, {})
             return "—" if not item.get("pair_count") else f"{item['mean_cosine']:.3f} ± {item['std_cosine']:.3f}"
+        before = rebuild.get(book_id, {}).get("meta_collapse_before", "—")
         lines.append(
-            f"| {book_id} | {data['scene_count']} | {cell('text-dense')} | "
-            f"{cell('meta-dense')} | {cell('summary-dense')} |"
+            f"| {book_id} | {data['scene_count']} | {before} | {cell('meta-dense')} | "
+            f"{cell('text-dense')} | {cell('summary-dense')} |"
         )
+    before_values = [
+        rebuild[book_id]["meta_collapse_before"] for book_id in summary["collapse"]
+        if book_id in rebuild
+    ]
+    after_values = [
+        data["meta-dense"]["mean_cosine"] for data in summary["collapse"].values()
+        if data.get("meta-dense", {}).get("pair_count")
+    ]
+    before_text = (
+        f"{min(before_values):.3f}–{max(before_values):.3f}" if before_values else "—"
+    )
+    after_text = (
+        f"{min(after_values):.3f}–{max(after_values):.3f}" if after_values else "—"
+    )
+    baseline_meta = (baseline.get("route_hits") or {}).get("meta_dense")
+    baseline_rrf = baseline.get("rrf_hits")
+    baseline_total = baseline.get("probe_count")
     lines += [
         "",
         "## 三、结论",
         "",
-        "- **查询构造是主因。** 仅标签查询在 8 条 miss 探针上 0/8 进入 Top-5；“原始需求”在同一向量空间 "
-        "8/8 命中且全部排第 1，“原文+标签”也达到 7/8，修复后的“需求+标签”达到 7/8，"
-        "与多书基线 meta 路由 24/28 的回升一致。标签串把查询推向空间中心，叙事内容被抹掉。",
-        "- **向量空间确实塌缩。** 四本书的 `meta-dense` 两两余弦均值 0.81–0.84，高于 `text-dense` "
-        "0.70–0.77 与 `summary-dense` 0.55–0.72；当前构造的 Top1 与 Top20 均分只差约 0.04，"
-        "排序基本由噪声决定。",
-        f"- **标签体系对齐不足。** 查询标签与目标场景标签的平均 Jaccard 重合度仅 "
-        f"{summary['mean_tag_overlap']:.2f}，查询侧 canonical 标签与标注侧常用标签不一致。",
-        "- 因此这是“查询构造 + 标注/词表 + 向量同质”的叠加问题，只靠改提示词无法根治；"
-        "先修查询构造，再评估是否需要重建 meta 标注与向量。",
+        f"- **查询构造是主因。** 这 8 条原 miss 探针上，仅标签查询 {hits.get('tags_only', 0)}/8 "
+        f"进入 Top-5；“原始需求”{hits.get('raw_intent', 0)}/8，"
+        f"修复后的“需求+标签”{hits.get('current_meta_query', 0)}/8。标签串把查询推向空间中心，"
+        "叙事内容被抹掉。",
+        f"- **向量空间已通过重建显著缓解。** `meta-dense` 书内两两余弦从重建前 {before_text} "
+        f"降到重建后 {after_text}，不再接近全同；text-dense 仍在 0.70–0.77 区间。",
+        f"- **标签体系对齐仍然不足。** 查询标签与目标场景标签的平均 Jaccard 重合度仅 "
+        f"{summary['mean_tag_overlap']:.2f}，收敛词表仍是后续工作。",
+        (f"- **基线与重建叠加后**：meta 路由 {baseline_meta}/{baseline_total}，"
+         f"RRF {baseline_rrf}/{baseline_total}。" if baseline_meta else ""),
         "",
-        "## 四、修复方向",
+        "## 四、修复记录",
         "",
-        "1. 查询侧（已实施）：meta 查询改为 `raw_intent` 锚点 + canonical 标签；新基线结果见"
-        " `reports/retrieval-baseline-multi-book-2026-11-13.md`。",
-        "2. 标注侧：`style_summary` 要求写入可区分的具体手法与对象，减少“克制、短句、电影感”等泛化词；"
-        "必要时重建 meta-dense 向量。",
-        "3. 词表侧：收敛高频通用标签，增加能区分场景的技法/意象标签，并核对查询映射，提升 Jaccard 重合度。",
-        "4. 路由侧：在 meta 空间同质化缓解前，把它当补充路；中期可评估“标签过滤 + 稠密重排”的组合，"
-        "而不是独立召回。",
+        "1. 查询侧（已实施）：meta 查询改为 `raw_intent` 锚点 + canonical 标签。",
+        "2. 标注/向量侧（已实施）：引入具体化风格签名并重建 meta-dense 向量，"
+        "260 个入选场景全部重建、0 失败；",
+        "   方法与前后指标见 `reports/meta-vector-rebuild-2026-11-16.md`。",
+        "3. 词表侧（待办）：收敛高频通用标签，增加能区分场景的技法/意象标签，提升 Jaccard 重合度。",
+        "4. 路由侧（待办）：评估“标签过滤 + 稠密重排”的组合，而不是仅靠独立召回。",
         "",
         f"机器可读结果：`{RESULT_PATH.as_posix()}`。",
         "",

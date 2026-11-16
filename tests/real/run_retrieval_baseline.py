@@ -242,7 +242,7 @@ def main() -> None:
 
         summary = _summarize(rows, multi_rows, rerank_row, books)
         payload = {
-            "generated_at": "2026-11-13",
+            "generated_at": "2026-11-16",
             "database": settings.postgres_db,
             "qdrant_url": settings.qdrant_url,
             "books": books,
@@ -321,6 +321,8 @@ def _render_report(payload: dict[str, Any]) -> str:
     probes = payload["probes"]
     lines: list[str] = [
         "# Novel-RAG 多书检索基线 · 2026-11-13",
+        "",
+        "> 最后更新：2026-11-16（meta 向量重建后重跑）。",
         "",
         f"运行环境：PostgreSQL `{payload['database']}`、Qdrant `{payload['qdrant_url']}`。"
         "覆盖公开快照中的四本书（含《百年孤独》），共 "
