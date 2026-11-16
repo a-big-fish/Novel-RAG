@@ -114,9 +114,12 @@ class WritingReferenceService:
         if output in ("fragments", "both"):
             response["fragments"] = _fragments(result)
         if output in ("prompt", "both"):
+            task = writing_goal.strip()
+            if outline_context.strip():
+                task = f"{task}\n\n情节上下文：{outline_context.strip()}"
             assembly = assemble_search_result(
                 result, self.repository, self.settings,
-                task=writing_goal.strip(),
+                task=task,
                 constraints=constraints,
                 options=AssemblyOptions(
                     budget_chars=budget_chars or self.settings.assembly_budget_chars,

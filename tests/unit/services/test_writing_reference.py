@@ -71,6 +71,7 @@ def test_service_plans_query_and_assembles_prompt():
     assert "写一段持枪对峙" in searcher.calls[0]["query"]
     assert result["query_plan"]["has_constraints"] is True
     assert result["prompt"]["text"]
+    assert "情节上下文：主角被堵在店里" in result["prompt"]["text"]
     assert result["references"][0]["scene_id"] == 1
     assert result["fragments"] is None
 
