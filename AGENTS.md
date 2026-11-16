@@ -26,7 +26,7 @@ uv run pytest tests/integration -q -m integration
 uv run python -B -m tests.real.run_retrieval_baseline
 ```
 
-`uv sync` installs dependencies, migration commands initialize the database, and `uvicorn` starts the API at `/api/v1` with health checking at `/health`. The local default database is the observation database `novel-rag-test-2`; it contains the multi-book demo data (including the locally indexed 《百年孤独》) and is also used by integration tests. CI should use a separate database. Unit tests run without external services; integration tests require PostgreSQL, Qdrant, and fixtures.
+`uv sync` installs dependencies, migration commands initialize the database, and `uvicorn` starts the API at `/api/v1` with health checking at `/health`. The local observation database is `novel_rag`; it contains the multi-book demo data (including the locally indexed 《百年孤独》) and is the default for the app, MCP and baseline scripts. Integration tests use the separate `novel_rag_test` database. Unit tests run without external services; integration tests require PostgreSQL, Qdrant, and fixtures.
 
 ## Coding Style & Naming Conventions
 
@@ -42,4 +42,4 @@ Commit each completed feature change, fix, or refactor as a focused Git commit. 
 
 ## Security & Configuration Tips
 
-Copy `.env.example` to `.env` and provide local credentials; never commit `.env`, book contents, converted caches, or API keys. Run production migrations only after explicit confirmation; `--test` targets `novel-rag-test-2`, which is also the local observation database. Keep the release version aligned across `pyproject.toml`, `app/config.py`, and `.env.example` (currently `0.9.0`).
+Copy `.env.example` to `.env` and provide local credentials; never commit `.env`, book contents, converted caches, or API keys. Run production migrations only after explicit confirmation; `--test` targets the isolated `novel_rag_test` database. Keep the release version aligned across `pyproject.toml`, `app/config.py`, and `.env.example` (currently `0.9.0`).

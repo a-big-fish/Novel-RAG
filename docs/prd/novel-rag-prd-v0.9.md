@@ -33,7 +33,7 @@
 | 上下文拼接 | TBD，不定义 | 明确定义对外契约（见第六章） |
 | 交付形态 | 仅 HTTP | 云服务 HTTP + stdio MCP |
 | 质量评估 | 单书 10 条探针 | 多书规模化基线（见第十章） |
-| 默认运行库 | 无明确默认，观察数据在独立预览模式 | 默认指向本地观察库 `novel-rag-test-2` |
+| 默认运行库 | 无明确默认，观察数据在独立预览模式 | 默认指向观察库 `novel_rag`，测试库为独立的 `novel_rag_test` |
 
 ---
 
@@ -223,7 +223,9 @@ POST /api/v1/search/multi/stream
 
 ```text
 1. 校验书单与版本，固定本次请求的 (book_id, version) 集合
-2. 查询解析一次；失败或字段为空时退化为 raw_intent，不重复解析
+2. 查询解析一次；使用 **latency-first** 参数（`reasoning_effort=minimal`、`max_tokens=400`、
+   温度 0、超时 45 秒、不重试、`response_format=json_object`）；失败或超时立即退化为
+   `raw_intent`，并把 fallback 结果缓存 6 小时，避免同一慢查询反复等待；成功结果照常持久缓存。
 3. 只执行一轮查询向量化：text / meta / summary 三路查询向量 + 稀疏查询
 4. 对每本书并发执行四路独立召回，各自保留 rank 与原始 score
 5. 每本书内做无权重 RRF，得到书内候选
@@ -386,6 +388,13 @@ v0.9 不新增必需表。沿用 v0.8 已实现的表结构：`books`、`chapter
 
 meta 查询的构造在 2026-11-13 修复为 **`raw_intent` 锚点 + canonical 标签**：诊断显示纯标签查询落在高度同质的 meta 向量空间中心，8 条 miss 探针全部无法进入 Top-5；加入需求锚点后该路由基线从 9/28 回升到 24/28（证据见第十章与 `reports/meta-route-diagnosis-2026-11-13.md`）。
 
+查询解析是检索链路里唯一同步调用 LLM 的步骤，按 **latency-first** 设计：默认
+`QUERY_LLM_REASONING_EFFORT=minimal`、`QUERY_LLM_MAX_TOKENS=400`、温度 0、
+`QUERY_LLM_TIMEOUT_SECONDS=45`、`QUERY_LLM_MAX_RETRIES=0`、`response_format=json_object`；
+超时或错误立即回退 `raw_intent`，并把 fallback 写入带 TTL 的缓存（默认 6 小时），同一慢查询
+不会反复阻塞。实测同一端点下解析通常 1–3 秒；此前的数分钟等待属于上游模型/网关的瞬时行为，
+现在由 45 秒超时兜底。需要更换更快的解析模型时设置 `QUERY_LLM_MODEL` 即可，不影响标注/评估模型。
+
 ### 9.2 多书聚合
 
 见第五章。当前实现策略为 `round_robin_book_rrf`；重排为可选链路，通过 `RERANK_ENABLED` 控制，并在每次多书检索前重新读取配置。
@@ -477,9 +486,19 @@ meta 向量重建的方法、重建前后书内余弦与复现命令见 [`report
 ```bash
 APP_VERSION=0.9.0
 
-# 默认本地观察库（含四书观察数据；公开快照可导入）
-POSTGRES_DB=novel-rag-test-2
-POSTGRES_TEST_DB=novel-rag-test-2
+# 观察库（已含四本解析完成的书；第三方接入无需重新索引）
+POSTGRES_DB=novel_rag
+POSTGRES_TEST_DB=novel_rag_test
+
+# 查询解析（latency-first）
+QUERY_LLM_MODEL=
+QUERY_LLM_TEMPERATURE=0
+QUERY_LLM_MAX_TOKENS=400
+QUERY_LLM_REASONING_EFFORT=minimal
+QUERY_LLM_TIMEOUT_SECONDS=45
+QUERY_LLM_MAX_RETRIES=0
+QUERY_LLM_JSON_RESPONSE_FORMAT=true
+QUERY_FALLBACK_CACHE_SECONDS=21600
 
 # 多书聚合
 MULTI_SEARCH_MAX_BOOKS=20
@@ -615,7 +634,7 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 | MCP 与 HTTP 语义漂移 | 两套行为不一致 | 共享领域层与响应结构，契约测试覆盖两条入口 |
 | 隧道暴露无鉴权 | 公网数据泄露 | 默认仅本机；隧道前启用 Cloudflare Access / API Key |
 | 作品权利异议 | 公开快照需下架 | `NOTICE.md` 说明与 takedown 流程；导出脚本可重新生成快照 |
-| 观察库与测试库同名 | 测试污染演示数据 | 当前共用 `novel-rag-test-2`；CI 按需使用独立库 |
+| 观察库与测试库同名 | 测试污染演示数据 | 已分离为 `novel_rag`（观察）与 `novel_rag_test`（测试）；CI 可另建 |
 | 未来云化改造成本 | 迁移返工 | 契约与网络形态解耦；当前只依赖本机 + 隧道 |
 
 ---

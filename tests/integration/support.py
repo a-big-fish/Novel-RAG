@@ -3,7 +3,7 @@ from __future__ import annotations
 from app.config import get_settings
 from app.db.postgres import PostgresDatabase
 
-TEST_DATABASE_NAME = "novel-rag-test-2"
+TEST_DATABASE_NAME = "novel_rag_test"
 
 
 def build_test_database() -> PostgresDatabase:

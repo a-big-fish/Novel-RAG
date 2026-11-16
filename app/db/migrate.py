@@ -27,7 +27,7 @@ def main() -> None:
         # Keep migrations away from older test databases even when .env
         # overrides POSTGRES_TEST_DB.
         settings = settings.model_copy(
-            update={"postgres_test_db": "novel-rag-test-2"}
+            update={"postgres_test_db": "novel_rag_test"}
         )
     database = PostgresDatabase.from_settings(settings, test=args.test)
     database.apply_migration(Path(args.migration))

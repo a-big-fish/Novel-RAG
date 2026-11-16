@@ -8,7 +8,7 @@ from app.db.postgres import PostgresDatabase, PostgresRepository
 from app.services.indexer import Indexer
 from app.utils.epub import sha256_file
 
-TEST_DATABASE_NAME = "novel-rag-test-2"
+TEST_DATABASE_NAME = "novel_rag_test"
 
 
 def main() -> None:

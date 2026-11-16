@@ -75,8 +75,9 @@ MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 600
 前置条件：
 
 1. `.env` 已配置 PostgreSQL、Qdrant、Ollama 与可用的 LLM，并执行迁移
-   `007_index_job_queue.sql`；至少有一本书索引到 `ready`（可用 `list_books` 或
-   `get_service_status` 检查）。
+   `007_index_job_queue.sql`。本机默认观察库 `novel_rag` **已经包含四本解析完成的书**
+   （含《百年孤独》），可直接检索；只有新建库才需要导入快照或重新索引。
+   可用 `list_books` 或 `get_service_status` 检查。
 2. 本机有 `uv`，或直接使用仓库的 `.venv`。
 3. MCP 走 stdio，由客户端进程拉起，不需要公网端口，也没有额外鉴权；跨机使用需要远程
    MCP 桥接或隧道（以后可能的实现）。
@@ -112,8 +113,10 @@ MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 600
 ```
 
 接入后建议先让 AI 调 `get_service_status` 确认依赖，再调用 `search_writing_references`。
-首次未命中的查询会调用外部 LLM 做需求解析，可能耗时数十秒到数分钟；解析结果有持久缓存，
-同一查询再次调用会明显更快，客户端工具超时应设置得宽裕。已知错误会通过 MCP
+查询解析采用 latency-first 参数（`QUERY_LLM_REASONING_EFFORT=minimal`、`QUERY_LLM_MAX_TOKENS=400`、
+温度 0、`QUERY_LLM_TIMEOUT_SECONDS=45`、不重试），实测解析通常 1–3 秒；超时或失败会立即退化为
+`raw_intent`，并把 fallback 缓存 `QUERY_FALLBACK_CACHE_SECONDS`（默认 6 小时），同一慢查询不会反复阻塞。
+如需更快的解析模型，设置 `QUERY_LLM_MODEL`（不影响标注/评估使用的模型）。已知错误会通过 MCP
 `is_error=true` 与可读消息返回，不会只显示“执行失败”。
 
 ## 界面预览
@@ -198,7 +201,7 @@ Rerank 仅在检索时按配置执行；未开启时直接返回聚合排序结�
 - 首次启动会下载 Embedding 模型；开启重排时还会下载 Reranker。模型下载和推理需要足够的磁盘、内存与算力，CPU 可运行但会较慢。
 - 当前 API 没有用户认证。Compose 默认只将服务端口绑定到 `127.0.0.1`；对公网开放前须自行加访问控制。
 - 公网访问当前采用**本机 + Cloudflare Tunnel（或同类内网穿透）**，不租赁服务器；云服务器/托管云服务是以后可能的实现。隧道只转发应用 HTTP，启用前必须配置 Cloudflare Access、API Key 或反向代理鉴权，且不要暴露 PostgreSQL/Qdrant/Ollama 端口。
-- 本机默认数据库为观察库 `novel-rag-test-2`（含多书观察数据）；生产部署请使用独立数据库并在迁移后导入或重新索引书籍。
+- 本机默认数据库为观察库 `novel_rag`（已含四本解析完成的书）；测试库为独立的 `novel_rag_test`。生产部署另建库并在迁移后导入或重新索引书籍。
 - stdio MCP 交付形态是 v0.9 的实现重点，但工具集合与调用粒度尚未定型；当前对外入口为 HTTP API。
 
 ### Docker Compose 启动
@@ -229,7 +232,7 @@ uv run python -m app.db.migrate migrations/007_index_job_queue.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-`POSTGRES_DB` 指向需要初始化的数据库；本机默认使用观察库 `novel-rag-test-2`，其中包含多书观察数据与本地索引的《百年孤独》。`POSTGRES_TEST_DB` 默认与该库一致；生产或 CI 建议另建独立库。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
+`POSTGRES_DB` 指向需要初始化的数据库；本机默认使用观察库 `novel_rag`，其中已包含四本解析完成的书与本地索引的《百年孤独》，第三方接入无需重新索引。`POSTGRES_TEST_DB` 使用独立的 `novel_rag_test`，集成测试不会污染观察数据。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
 
 场景边界判断会按模型、提示词版本与输入内容缓存到 PostgreSQL；长篇索引中断后可复用已完成窗口。`SCENE_MIN_CHARS` 控制接受模型边界的最小场景长度。升级旧版本后，已有书籍需重新索引才能采用新的 EPUB 章节与场景切分结果。
 
@@ -300,7 +303,7 @@ docker compose exec app python -m scripts.restore_public_qdrant sql/fixtures/pub
 源快照可由已授权的数据库重新生成：
 
 ```bash
-uv run python -m scripts.export_public_fixture --book-ids 10 43 44 86 --database novel-rag-test-2 --output sql/fixtures/new-export --confirm-public-rights
+uv run python -m scripts.export_public_fixture --book-ids 10 43 44 86 --database novel_rag --output sql/fixtures/new-export --confirm-public-rights
 ```
 
 ### 作品与侵权联系

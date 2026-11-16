@@ -196,7 +196,7 @@ def export_fixture(book_ids: list[int], database_name: str, output: Path) -> Non
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--book-ids", type=int, nargs="+", required=True)
-    parser.add_argument("--database", default="novel-rag-test-2")
+    parser.add_argument("--database", default="novel_rag")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--confirm-public-rights", action="store_true", required=True)
     args = parser.parse_args()

@@ -19,7 +19,7 @@ def test_missing_schema_explains_migration_startup():
     try:
         response = TestClient(app).get("/api/v1/books")
         assert response.status_code == 503
-        assert "novel-rag-test-2" in response.json()["detail"]
+        assert "novel_rag" in response.json()["detail"]
         assert "迁移" in response.json()["detail"]
         assert "SELECT" not in response.text
     finally:
