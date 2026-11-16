@@ -366,44 +366,74 @@ class Indexer:
             )
         return collection_name, indexed_count
 
-    def run(self, book_id: int) -> dict[str, Any]:
+    def run(
+        self,
+        book_id: int,
+        *,
+        version: int | None = None,
+        completed_stages: set[str] | None = None,
+        on_stage_complete: Callable[[str], None] | None = None,
+    ) -> dict[str, Any]:
         book = self.repository.get_book(book_id)
         if book is None:
             raise NovelRagError(f"book not found: {book_id}")
 
-        version = int(book["current_version"] or 0) + 1
+        version = version or int(book["current_version"] or 0) + 1
+        done = set(completed_stages or ())
         collection_name = ""
         is_epub = book["source_format"] == "epub"
-        try:
-            self.repository.update_book(
-                book_id,
-                status="converting" if is_epub else "splitting",
-                error_message=None,
-            )
-            txt_path = self._run_job(
-                book_id,
-                "convert" if is_epub else "prepare_text",
-                lambda: self._converted_txt(book),
-            )
-            self.repository.update_book(
-                book_id,
-                converted_path=str(txt_path),
-                converter_version=(
-                    self._epub_converter_version()
-                    if book["source_format"] == "epub"
-                    else None
-                ),
-            )
+        txt_path: Path | None = None
 
-            self.repository.update_book(book_id, status="splitting")
-            scene_rows = self._run_job(
-                book_id,
-                "split",
-                lambda progress: self._split_and_store(
-                    book_id, version, txt_path, progress,
-                ),
-                progress_operation=True,
-            )
+        def notify(stage: str) -> None:
+            if on_stage_complete is not None:
+                on_stage_complete(stage)
+
+        try:
+            if "split" not in done:
+                self.repository.update_book(
+                    book_id,
+                    status="converting" if is_epub else "splitting",
+                    error_message=None,
+                )
+                txt_path = self._run_job(
+                    book_id,
+                    "convert" if is_epub else "prepare_text",
+                    lambda: self._converted_txt(book),
+                )
+                self.repository.update_book(
+                    book_id,
+                    converted_path=str(txt_path),
+                    converter_version=(
+                        self._epub_converter_version()
+                        if book["source_format"] == "epub"
+                        else None
+                    ),
+                )
+
+                self.repository.update_book(book_id, status="splitting")
+                scene_rows = self._run_job(
+                    book_id,
+                    "split",
+                    lambda progress: self._split_and_store(
+                        book_id, version, txt_path, progress,
+                    ),
+                    progress_operation=True,
+                )
+                notify("split")
+            else:
+                # Resume after a crash: scenes are already stored for this
+                # version, so re-running split would discard downstream work.
+                scene_rows = [
+                    dict(row)
+                    for row in self.repository.list_scenes(book_id, version)
+                ]
+                if not scene_rows:
+                    raise NovelRagError(
+                        "cannot resume index: no scenes stored for "
+                        f"book={book_id}, version={version}"
+                    )
+                converted = book.get("converted_path")
+                txt_path = Path(str(converted)) if converted else None
 
             self.repository.update_book(book_id, status="screening")
             screener = SceneQualityScreener(
@@ -417,6 +447,7 @@ class Indexer:
                 lambda: screener.screen_book(book_id, version),
                 total_items=len(scene_rows),
             )
+            notify("screen")
             self.repository.update_book(book_id, status="evaluating")
             evaluator = ReferenceEvaluator(
                 repository=self.repository,
@@ -429,6 +460,7 @@ class Indexer:
                 lambda: evaluator.evaluate_book(book_id, version),
                 total_items=len(scene_rows),
             )
+            notify("evaluate")
             evaluation_stats["total"] += screening_stats["rejected"]
             self.repository.update_book(
                 book_id,
@@ -457,6 +489,7 @@ class Indexer:
                 lambda: annotator.annotate_book(book_id, version),
                 total_items=evaluation_stats["selected"],
             )
+            notify("annotate")
 
             self.repository.update_book(book_id, status="indexing")
             all_scene_rows = [
@@ -488,6 +521,7 @@ class Indexer:
                 ),
                 total_items=len(selected_rows),
             )
+            notify("embed")
             collection_name, indexed_selected_count = self._run_job(
                 book_id,
                 "store",
@@ -498,17 +532,21 @@ class Indexer:
                 ),
                 total_items=len(points),
             )
+            notify("store")
             self._run_job(
                 book_id,
                 "sync",
                 lambda: self.repository.activate_version(book_id, version),
                 total_items=indexed_selected_count,
             )
+            notify("sync")
             return {
                 "book_id": book_id,
                 "version": version,
                 "collection": collection_name,
-                "chapters": len(split_chapters(txt_path.read_text(encoding="utf-8"))),
+                "chapters": int(
+                    self.repository.get_book(book_id)["total_chapters"] or 0
+                ),
                 "scenes": len(all_scene_rows),
                 "selected_scenes": evaluation_stats["selected"],
                 "archived_scenes": evaluation_stats["archived"],

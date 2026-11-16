@@ -3,12 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, create_engine, delete, func, insert, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 
 from app.config import Settings, get_settings
 from app.db.models import (
@@ -873,6 +874,254 @@ class PostgresRepository:
                 .order_by(index_jobs.c.id.desc())
             ).mappings().all()
         return list(rows)
+
+    # ------------------------------------------------------------------
+    # Durable index-job queue (in-process worker; no external middleware)
+    # ------------------------------------------------------------------
+
+    ACTIVE_JOB_STATUSES = ("queued", "leased", "running", "retrying")
+
+    def active_index_job(self, book_id: int) -> Mapping[str, Any] | None:
+        with self.engine.connect() as connection:
+            row = connection.execute(
+                select(index_jobs)
+                .where(
+                    index_jobs.c.book_id == book_id,
+                    index_jobs.c.job_type == "index",
+                    index_jobs.c.status.in_(self.ACTIVE_JOB_STATUSES),
+                )
+                .order_by(index_jobs.c.id.desc())
+                .limit(1)
+            ).mappings().first()
+        return row
+
+    def enqueue_index_job(
+        self, book_id: int, *, max_attempts: int = 3,
+    ) -> Mapping[str, Any]:
+        """Queue one index request, returning the existing active job if any."""
+        with self.engine.begin() as connection:
+            existing = connection.execute(
+                select(index_jobs)
+                .where(
+                    index_jobs.c.book_id == book_id,
+                    index_jobs.c.job_type == "index",
+                    index_jobs.c.status.in_(self.ACTIVE_JOB_STATUSES),
+                )
+                .order_by(index_jobs.c.id.desc())
+                .limit(1)
+            ).mappings().first()
+            if existing is not None:
+                return dict(existing)
+            try:
+                with connection.begin_nested():
+                    row = connection.execute(
+                        insert(index_jobs)
+                        .values(
+                            book_id=book_id,
+                            job_type="index",
+                            stage="queued",
+                            status="queued",
+                            max_attempts=max_attempts,
+                            next_retry_at=_utc_now(),
+                        )
+                        .returning(*index_jobs.c)
+                    ).mappings().one()
+                return dict(row)
+            except IntegrityError:
+                # A concurrent request queued the same book first.
+                existing = connection.execute(
+                    select(index_jobs)
+                    .where(
+                        index_jobs.c.book_id == book_id,
+                        index_jobs.c.job_type == "index",
+                        index_jobs.c.status.in_(self.ACTIVE_JOB_STATUSES),
+                    )
+                    .order_by(index_jobs.c.id.desc())
+                    .limit(1)
+                ).mappings().first()
+                if existing is None:
+                    raise
+                return dict(existing)
+
+    def claim_index_job(
+        self, *, worker_id: str, lease_seconds: int,
+    ) -> Mapping[str, Any] | None:
+        """Lease the next runnable index job without blocking other workers."""
+        now = _utc_now()
+        with self.engine.begin() as connection:
+            candidate = connection.execute(
+                select(index_jobs)
+                .where(
+                    index_jobs.c.job_type == "index",
+                    index_jobs.c.status.in_(("queued", "retrying")),
+                    index_jobs.c.next_retry_at <= now,
+                )
+                .order_by(index_jobs.c.id)
+                .with_for_update(skip_locked=True)
+                .limit(1)
+            ).mappings().first()
+            if candidate is None:
+                return None
+            row = connection.execute(
+                update(index_jobs)
+                .where(index_jobs.c.id == candidate["id"])
+                .values(
+                    status="leased",
+                    worker_id=worker_id,
+                    attempts=index_jobs.c.attempts + 1,
+                    heartbeat_at=now,
+                    lease_expires_at=now + timedelta(seconds=lease_seconds),
+                    error_message=None,
+                )
+                .returning(*index_jobs.c)
+            ).mappings().one()
+            return dict(row)
+
+    def heartbeat_index_job(
+        self, job_id: int, *, worker_id: str, lease_seconds: int,
+    ) -> bool:
+        now = _utc_now()
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                update(index_jobs)
+                .where(
+                    index_jobs.c.id == job_id,
+                    index_jobs.c.worker_id == worker_id,
+                    index_jobs.c.status.in_(("leased", "running")),
+                )
+                .values(
+                    heartbeat_at=now,
+                    lease_expires_at=now + timedelta(seconds=lease_seconds),
+                )
+            )
+        return result.rowcount == 1
+
+    def update_index_job_checkpoint(
+        self, job_id: int, checkpoint: Mapping[str, Any],
+        *, stage: str | None = None,
+        total_items: int | None = None, done_items: int | None = None,
+    ) -> None:
+        values: dict[str, Any] = {"checkpoint": dict(checkpoint)}
+        if stage is not None:
+            values["stage"] = stage
+        if total_items is not None:
+            values["total_items"] = total_items
+        if done_items is not None:
+            values["done_items"] = done_items
+        with self.engine.begin() as connection:
+            connection.execute(
+                update(index_jobs).where(index_jobs.c.id == job_id).values(**values)
+            )
+
+    def complete_index_job(
+        self, job_id: int, *, worker_id: str, result: Mapping[str, Any] | None = None,
+    ) -> bool:
+        now = _utc_now()
+        with self.engine.begin() as connection:
+            row = connection.execute(
+                select(index_jobs)
+                .where(index_jobs.c.id == job_id)
+                .with_for_update()
+            ).mappings().first()
+            if row is None or row["worker_id"] != worker_id:
+                return False
+            checkpoint = dict(row["checkpoint"] or {})
+            if result is not None:
+                checkpoint["result"] = dict(result)
+            connection.execute(
+                update(index_jobs)
+                .where(index_jobs.c.id == job_id)
+                .values(
+                    status="completed",
+                    stage="sync",
+                    finished_at=now,
+                    lease_expires_at=None,
+                    checkpoint=checkpoint,
+                )
+            )
+        return True
+
+    def fail_index_job(
+        self, job_id: int, *, worker_id: str, error: str,
+        retry_in_seconds: int | None = None,
+    ) -> str:
+        """Record a failure; return the new status (retrying or failed)."""
+        now = _utc_now()
+        with self.engine.begin() as connection:
+            row = connection.execute(
+                select(index_jobs)
+                .where(index_jobs.c.id == job_id)
+                .with_for_update()
+            ).mappings().first()
+            if row is None:
+                raise StorageError(f"index job not found: {job_id}")
+            attempts = int(row["attempts"] or 0)
+            max_attempts = int(row["max_attempts"] or 1)
+            can_retry = retry_in_seconds is not None and attempts < max_attempts
+            status = "retrying" if can_retry else "failed"
+            values: dict[str, Any] = {
+                "status": status,
+                "worker_id": None,
+                "lease_expires_at": None,
+                "error_message": error[:2000],
+                "next_retry_at": (
+                    now + timedelta(seconds=retry_in_seconds) if can_retry else None
+                ),
+                "finished_at": None if can_retry else now,
+            }
+            connection.execute(
+                update(index_jobs).where(index_jobs.c.id == job_id).values(**values)
+            )
+        return status
+
+    def reclaim_expired_index_jobs(self) -> int:
+        """Return expired leases to the queue (crash / stalled worker recovery)."""
+        now = _utc_now()
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                update(index_jobs)
+                .where(
+                    index_jobs.c.job_type == "index",
+                    index_jobs.c.status.in_(("leased", "running")),
+                    index_jobs.c.lease_expires_at.isnot(None),
+                    index_jobs.c.lease_expires_at < now,
+                )
+                .values(
+                    status="retrying",
+                    worker_id=None,
+                    lease_expires_at=None,
+                    next_retry_at=now,
+                    error_message="worker lease expired; job returned to queue",
+                )
+            )
+        return result.rowcount
+
+    def cancel_index_job(self, job_id: int) -> bool:
+        now = _utc_now()
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                update(index_jobs)
+                .where(
+                    index_jobs.c.id == job_id,
+                    index_jobs.c.status.in_(("queued", "retrying", "leased", "running")),
+                )
+                .values(
+                    status="canceled",
+                    canceled_at=now,
+                    finished_at=now,
+                    lease_expires_at=None,
+                    next_retry_at=None,
+                    worker_id=None,
+                )
+            )
+        return result.rowcount == 1
+
+    def get_index_job(self, job_id: int) -> Mapping[str, Any] | None:
+        with self.engine.connect() as connection:
+            return connection.execute(
+                select(index_jobs).where(index_jobs.c.id == job_id)
+            ).mappings().first()
+
 
     @staticmethod
     def json_dumps(value: Mapping[str, Any]) -> str:

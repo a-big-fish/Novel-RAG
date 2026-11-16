@@ -24,6 +24,7 @@ from app.db.models import (
 from app.db.postgres import PostgresDatabase, PostgresRepository
 from app.db.qdrant import QdrantAdapter
 from app.services.indexer import Indexer
+from app.services.index_worker import IndexWorker
 from app.services.llm_splitter import CrossChapterDecision, SceneBoundaryDecision
 from app.services.scene_quality import SceneQualityDecision
 from app.services.schema import (
@@ -43,6 +44,9 @@ class FakeLLM:
 
     def __init__(self) -> None:
         self.archive_all = False
+
+    def close(self) -> None:
+        return None
 
     def request_typed(self, **kwargs: Any) -> Any:
         if kwargs["response_model"] is SceneBoundaryDecision:
@@ -93,6 +97,9 @@ class FakeLLM:
 
 class FakeOllama:
     model = "fake-embedding-model"
+
+    def close(self) -> None:
+        return None
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         result: list[list[float]] = []
@@ -231,6 +238,82 @@ def test_indexer_micro_novel_end_to_end(tmp_path: Path) -> None:
                         scene_quality_cache.c.model == FakeLLM.model
                     )
                 )
+                connection.execute(
+                    delete(embedding_cache).where(
+                        embedding_cache.c.model == FakeOllama.model
+                    )
+                )
+        database.dispose()
+
+
+def test_index_worker_completes_queued_job(tmp_path: Path) -> None:
+    source = write_micro_novel(tmp_path / "worker-micro-novel.txt")
+    marker = uuid.uuid4().hex[:8]
+    source.write_text(
+        source.read_text(encoding="utf-8").replace(
+            "第一章 雨夜来客", f"第一章 雨夜来客 {marker}", 1,
+        ),
+        encoding="utf-8",
+    )
+    database = build_test_database()
+    repository = PostgresRepository(database)
+    settings = Settings(
+        _env_file=None,
+        embedding_dimension=4,
+        data_converted_dir=tmp_path / "worker-converted",
+        llm_concurrency=1,
+        scene_min_chars=1,
+        tag_vocab_version="v1",
+        index_worker_poll_seconds=0.5,
+        index_worker_heartbeat_seconds=5,
+        index_worker_lease_seconds=60,
+    )
+    qdrant = QdrantAdapter(
+        QdrantClient(location=":memory:"), settings=settings, dimension=4,
+    )
+    vocabulary = TagVocabulary.from_json(
+        Path(__file__).resolve().parents[2]
+        / "app" / "data" / "tag_vocab" / "v1.json"
+    )
+    book_id: int | None = None
+    try:
+        book_id, _ = repository.register_book(
+            title="队列工作线程微型小说",
+            author="fixture",
+            source_path=str(source),
+            source_format="txt",
+            source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+        )
+
+        def factory(repo: PostgresRepository) -> Indexer:
+            return Indexer(
+                repository=repo, qdrant=qdrant, llm_client=FakeLLM(),
+                ollama_client=FakeOllama(), vocabulary=vocabulary,
+                settings=settings,
+            )
+
+        job = repository.enqueue_index_job(book_id)
+        worker = IndexWorker(repository, factory, settings)
+        assert worker.process_one() is True
+
+        record = repository.get_index_job(job["id"])
+        assert record["status"] == "completed"
+        assert record["checkpoint"]["completed_stages"][-1] == "sync"
+        book = repository.get_book(book_id)
+        assert book is not None and book["status"] == "ready"
+        assert book["current_version"] == 1
+    finally:
+        if book_id is not None:
+            with database.engine.begin() as connection:
+                for table in (index_jobs, token_map, scenes, chapters):
+                    connection.execute(delete(table).where(table.c.book_id == book_id))
+                connection.execute(delete(books).where(books.c.id == book_id))
+                for cache, column in (
+                    (annotation_cache, annotation_cache.c.model),
+                    (reference_evaluation_cache, reference_evaluation_cache.c.model),
+                    (scene_quality_cache, scene_quality_cache.c.model),
+                ):
+                    connection.execute(delete(cache).where(column == FakeLLM.model))
                 connection.execute(
                     delete(embedding_cache).where(
                         embedding_cache.c.model == FakeOllama.model

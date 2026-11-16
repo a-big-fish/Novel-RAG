@@ -58,6 +58,7 @@ class StartIndexResponse(BaseModel):
     book_id: int
     status: str
     index_started: bool
+    job_id: int | None = None
 
 
 _UPLOAD_SUFFIXES = {".epub", ".txt", ".md"}
@@ -289,6 +290,7 @@ def add_new_book(
 @router.post(
     "/{book_id}/index",
     response_model=StartIndexResponse,
+    response_model_exclude_none=True,
     status_code=status.HTTP_202_ACCEPTED,
 )
 def start_index(
@@ -296,6 +298,7 @@ def start_index(
     background_tasks: BackgroundTasks,
     repository: PostgresRepository = Depends(get_repository),
     indexer_factory: IndexerFactory = Depends(get_indexer_factory),
+    settings: Settings = Depends(get_app_settings),
 ) -> StartIndexResponse:
     book = repository.get_book(book_id)
     if book is None:
@@ -311,6 +314,25 @@ def start_index(
             book_id=book_id,
             status=str(book["status"]),
             index_started=False,
+        )
+
+    if settings.index_worker_enabled:
+        existing = repository.active_index_job(book_id)
+        if existing is not None:
+            return StartIndexResponse(
+                book_id=book_id,
+                status=str(existing["status"]),
+                index_started=False,
+                job_id=int(existing["id"]),
+            )
+        job = repository.enqueue_index_job(
+            book_id, max_attempts=settings.index_job_max_attempts,
+        )
+        return StartIndexResponse(
+            book_id=book_id,
+            status=str(job["status"]),
+            index_started=True,
+            job_id=int(job["id"]),
         )
 
     initial_status = "converting" if book["source_format"] == "epub" else "splitting"

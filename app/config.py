@@ -110,6 +110,15 @@ class Settings(BaseSettings):
     assembly_book_quota: int = Field(default=0, ge=0, le=50)
     assembly_template_version: str = "assembly-v1"
     mcp_server_name: str = "novel-rag"
+
+    # In-process index worker (PostgreSQL-backed queue; no middleware)
+    index_worker_enabled: bool = False
+    index_worker_poll_seconds: float = Field(default=5.0, ge=0.5, le=60)
+    index_worker_heartbeat_seconds: float = Field(default=30.0, ge=5, le=300)
+    index_worker_lease_seconds: int = Field(default=180, ge=30, le=3600)
+    index_job_max_attempts: int = Field(default=3, ge=1, le=10)
+    index_job_retry_backoff_seconds: int = Field(default=30, ge=1, le=600)
+    index_job_retry_max_seconds: int = Field(default=900, ge=30, le=7200)
     log_level: str = "INFO"
 
     @field_validator(

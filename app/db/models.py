@@ -15,6 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
@@ -262,10 +263,20 @@ index_jobs = Table(
     Column("id", _id_type, _identity, primary_key=True),
     Column("book_id", BigInteger, nullable=False),
     Column("stage", Text, nullable=False),
-    Column("status", Text, nullable=False, server_default="running"),
+    Column("status", Text, nullable=False, server_default="queued"),
     Column("total_items", Integer, nullable=False, server_default="0"),
     Column("done_items", Integer, nullable=False, server_default="0"),
     Column("error_message", Text),
+    Column("job_type", Text, nullable=False, server_default="stage"),
+    Column("target_version", Integer),
+    Column("attempts", Integer, nullable=False, server_default="0"),
+    Column("max_attempts", Integer, nullable=False, server_default="3"),
+    Column("next_retry_at", DateTime(timezone=True)),
+    Column("lease_expires_at", DateTime(timezone=True)),
+    Column("heartbeat_at", DateTime(timezone=True)),
+    Column("worker_id", Text),
+    Column("checkpoint", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("canceled_at", DateTime(timezone=True)),
     Column("started_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("finished_at", DateTime(timezone=True)),
 )

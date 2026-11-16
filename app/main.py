@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import ProgrammingError
 
-from app.api.dependencies import close_app_resources
+from app.api.dependencies import close_app_resources, get_repository
 from app.api.routes import (
     assemble,
     books,
@@ -19,15 +19,23 @@ from app.api.routes import (
 )
 from app.config import get_settings
 from app.logging_config import configure_logging
+from app.services.index_worker import build_index_worker
 from app.utils.errors import NovelRagError
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     configure_logging()
+    settings = get_settings()
+    worker = None
+    if settings.index_worker_enabled:
+        worker = build_index_worker(get_repository(), settings=settings)
+        worker.start()
     try:
         yield
     finally:
+        if worker is not None:
+            worker.stop()
         close_app_resources()
 
 
