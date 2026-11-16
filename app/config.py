@@ -51,10 +51,10 @@ class Settings(BaseSettings):
 
     postgres_host: str = "127.0.0.1"
     postgres_port: int = 5432
-    postgres_db: str = "novel-rag-test-2"
+    postgres_db: str = "novel_rag"
     postgres_user: str = "rag"
     postgres_password: SecretStr = SecretStr("")
-    postgres_test_db: str = "novel-rag-test-2"
+    postgres_test_db: str = "novel_rag_test"
 
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_api_key: SecretStr | None = None
@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     query_route_top_n: int = 20
     query_rrf_top_n: int = 20
     rrf_k: int = 60
+    # Fast query parsing: short timeout, no long reasoning, bounded output.
+    query_llm_model: str = ""
+    query_llm_temperature: float = 0.0
+    query_llm_max_tokens: int = Field(default=400, ge=64, le=4000)
+    query_llm_reasoning_effort: str = "minimal"
+    query_llm_timeout_seconds: float = Field(default=45.0, ge=5, le=600)
+    query_llm_max_retries: int = Field(default=0, ge=0, le=3)
+    query_llm_json_response_format: bool = True
+    query_fallback_cache_seconds: int = Field(default=21600, ge=0, le=604800)
     multi_search_max_books: int = Field(default=20, ge=1, le=100)
     multi_search_concurrency: int = Field(default=4, ge=1, le=32)
     multi_search_attempts: int = Field(default=2, ge=1, le=3)

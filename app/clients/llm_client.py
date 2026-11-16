@@ -5,6 +5,7 @@ import re
 import subprocess
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -15,6 +16,23 @@ from app.utils.errors import StorageError
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
+
+
+@dataclass(frozen=True)
+class LLMRequestOptions:
+    """Per-call overrides for latency-sensitive LLM work.
+
+    Query parsing must not inherit the long defaults used by annotation:
+    it sets a short timeout, no retries, bounded output and low reasoning.
+    """
+
+    model: str | None = None
+    temperature: float | None = None
+    max_tokens: int | None = None
+    reasoning_effort: str | None = None
+    timeout_seconds: float | None = None
+    max_retries: int | None = None
+    json_response_format: bool = False
 
 
 def extract_json_object(content: str) -> dict[str, Any]:
@@ -55,6 +73,20 @@ class JsonLLMClient(ABC):
         user_prompt: str,
     ) -> dict[str, Any]:
         raise NotImplementedError
+
+    def request_json_with_options(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        options: LLMRequestOptions | None = None,
+    ) -> dict[str, Any]:
+        """Adapters that support per-call knobs override this method."""
+
+        return self.request_json(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
 
     def request_typed(
         self,
@@ -117,32 +149,62 @@ class OpenAICompatibleClient(JsonLLMClient):
         system_prompt: str,
         user_prompt: str,
     ) -> dict[str, Any]:
+        return self.request_json_with_options(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            options=None,
+        )
+
+    def request_json_with_options(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        options: LLMRequestOptions | None = None,
+    ) -> dict[str, Any]:
+        options = options or LLMRequestOptions()
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        payload = {
-            "model": self.model,
+        payload: dict[str, Any] = {
+            "model": options.model or self.model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "temperature": 0.2,
+            "temperature": (
+                options.temperature
+                if options.temperature is not None else 0.2
+            ),
         }
-        for attempt in range(self.max_retries + 1):
+        if options.max_tokens is not None:
+            payload["max_tokens"] = options.max_tokens
+        if options.reasoning_effort:
+            payload["reasoning_effort"] = options.reasoning_effort
+        if options.json_response_format:
+            payload["response_format"] = {"type": "json_object"}
+        max_retries = (
+            options.max_retries
+            if options.max_retries is not None else self.max_retries
+        )
+        for attempt in range(max_retries + 1):
+            post_kwargs: dict[str, Any] = {"json": payload}
+            if options.timeout_seconds is not None:
+                post_kwargs["timeout"] = options.timeout_seconds
             try:
                 response = self.client.post(
                     self._chat_endpoint(),
                     headers=headers,
-                    json=payload,
+                    **post_kwargs,
                 )
                 response.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 status_code = exc.response.status_code
                 retryable = status_code in {408, 429} or status_code >= 500
-                if not retryable or attempt >= self.max_retries:
+                if not retryable or attempt >= max_retries:
                     raise StorageError(f"LLM request failed: {exc}") from exc
             except httpx.TransportError as exc:
-                if attempt >= self.max_retries:
+                if attempt >= max_retries:
                     raise StorageError(f"LLM request failed: {exc}") from exc
             else:
                 try:
@@ -158,7 +220,7 @@ class OpenAICompatibleClient(JsonLLMClient):
                             return extract_json_object(content)
                         except StorageError as exc:
                             error = exc
-                if attempt >= self.max_retries:
+                if attempt >= max_retries:
                     raise error
             if self.retry_backoff_seconds:
                 time.sleep(self.retry_backoff_seconds * (2**attempt))

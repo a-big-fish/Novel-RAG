@@ -800,6 +800,16 @@ class PostgresRepository:
             ).scalar_one_or_none()
         return dict(row) if row is not None else None
 
+    def get_query_cache_row(self, input_hash: str) -> dict[str, Any] | None:
+        with self.engine.connect() as connection:
+            row = connection.execute(
+                select(
+                    query_parsing_cache.c.output_json,
+                    query_parsing_cache.c.created_at,
+                ).where(query_parsing_cache.c.input_hash == input_hash)
+            ).mappings().first()
+        return dict(row) if row is not None else None
+
     def put_query_cache(
         self, *, input_hash: str, model: str, prompt_version: str,
         tag_vocab_version: str, query_text: str, output_json: dict[str, Any],
