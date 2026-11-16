@@ -103,6 +103,13 @@ class Settings(BaseSettings):
     rerank_concurrency: int = Field(default=1, ge=1, le=8)
     rerank_timeout_seconds: float = Field(default=180.0, gt=0)
     rerank_max_document_chars: int = Field(default=3600, ge=500, le=20000)
+
+    assembly_budget_chars: int = Field(default=6000, ge=500, le=50000)
+    assembly_max_scenes: int = Field(default=8, ge=1, le=50)
+    assembly_per_scene_chars: int = Field(default=1200, ge=100, le=10000)
+    assembly_book_quota: int = Field(default=0, ge=0, le=50)
+    assembly_template_version: str = "assembly-v1"
+    mcp_server_name: str = "novel-rag"
     log_level: str = "INFO"
 
     @field_validator(
