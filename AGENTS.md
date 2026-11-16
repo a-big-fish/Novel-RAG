@@ -18,6 +18,7 @@ uv run python -m app.db.migrate migrations/003_reference_evaluation.sql
 uv run python -m app.db.migrate migrations/004_query_parsing_cache.sql
 uv run python -m app.db.migrate migrations/005_scene_split_cache.sql
 uv run python -m app.db.migrate migrations/006_scene_quality_screen.sql
+uv run python -m app.db.migrate migrations/007_index_job_queue.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 uv run python -m app.mcp_server
 uv run pytest tests/unit -q

@@ -513,21 +513,45 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 - MCP：stdio 启动，随调用方进程生命周期，不额外监听端口。
 - 密钥只放环境变量，不落日志；公开仓库不提交 `.env`。
 
-### 13.2 长任务可靠性（索引）
+### 13.2 长任务可靠性（索引，不引入额外中间件）
 
-现状问题：`start_index` 使用 FastAPI `BackgroundTasks` 在 API 进程内执行，长书索引在模型超时、进程重启或人工中断时会丢失任务状态。
+**结论：不需要 Redis / Celery / RabbitMQ。** 本服务是单机、低并发的索引场景（一次索引一本书，
+阶段之间本来就有缓存与幂等表），可靠性缺口是"崩溃后能否续跑"，而不是"吞吐或跨机调度"。
+持久状态已经全在 PostgreSQL，用**数据库任务队列 + 租约 + 断点续跑**即可闭环，不新增端口、
+账号或运维对象。
 
-目标机制（M3）：
+现状问题：`start_index` 使用 FastAPI `BackgroundTasks` 在 API 进程内执行，长书索引在模型超时、
+进程重启或人工中断时会丢失任务状态。
 
-- **独立 worker / 守护进程**消费索引任务队列，API 只入队并返回 `job_id`；索引不再与 API 进程同生共死。
-- **分阶段 checkpoint**：章节整理、场景切分窗口、质量全筛、评估、标注、向量化各自幂等落库；中断后从最近完成点续跑。
-- **重试策略**：timeout、连接错误、429、5xx 使用指数退避 + 抖动并设置上限；非可重试错误直接记录失败原因，不空转。
-- **看门狗**：任务心跳 + 超时回收；进程崩溃后 stale 任务自动回到可重跑状态，不出现永久 `running`。
-- **幂等**：同一 `(book_id, version, scene_index)` 重复执行不产生重复行；Qdrant 按 point id 覆盖写入。
-- **可观测与人工操作**：阶段、尝试次数、最后错误、下次重试时间写库并在 Dashboard 展示；支持手动重试与取消。
+设计（M3，in-process 已实现）：
+
+- **队列即表**：扩展现有 `index_jobs`，增加 `job_type`（index/stage）、`status`（queued/leased/
+  running/completed/failed/retrying/canceled）、`attempts`、`max_attempts`、`next_retry_at`、
+  `lease_expires_at`、`heartbeat_at`、`worker_id`、`target_version`、`checkpoint JSONB`。
+  `start_index` 在 worker 开启时只入队并返回 `job_id`，不再直接跑任务。
+- **领取任务**：worker 用 `SELECT ... FOR UPDATE SKIP LOCKED` 领取；`job_type='index'` 上的
+  部分唯一索引保证每本书最多一个活跃索引请求；租约到期才允许接管。
+- **断点续跑**：沿用现有幂等资产——EPUB/TXT 转换缓存、场景切分缓存、质量全筛缓存、标注缓存、
+  Embedding 缓存、Scene 状态机；`checkpoint.completed_stages` 记录已完成阶段，重启后若 `split`
+  已完成则直接加载已存 Scene，避免重复切分与覆盖下游结果。
+- **重试与退避**：timeout、连接错误、429、5xx 按 `min(30 × 2^n, 900)` 秒退避，达到
+  `max_attempts` 标记 failed 并保留旧版本可用；文件缺失、格式错误等永久错误不重试。
+- **看门狗**：worker 每 30 秒心跳续租；进程崩溃后租约过期，下一次启动或轮询自动回收为
+  `retrying`，不出现永久 running。
+- **运行形态（当前选择）**：`INDEX_WORKER_ENABLED=true` 时，FastAPI lifespan 启动一个
+  in-process 守护线程；API 重启后线程随进程消失，但租约过期 + checkpoint 会在下次启动接管续跑。
+  独立 worker 进程（`python -m app.worker`）保留为后续可选项，不是当前必需。
+- **低延迟**：默认 5 秒轮询；需要时可加 PostgreSQL `LISTEN/NOTIFY`，仍不引入中间件。
+- **可观测与人工操作**：阶段、尝试次数、最后错误、下次重试时间、租约状态写库并在 Dashboard 展示；
+  取消接口在阶段边界生效（repository 已支持，HTTP 入口待补）。
 - **失败隔离**：单个 Scene 失败不阻塞整书；失败达到阈值时新版本不激活，旧版本继续可用。
 
-验收：人为 kill worker 后重启能自动续跑；重试次数与错误可查；不存在永远停留在 `running` 的任务。
+验收：worker 单测覆盖成功/续跑/瞬时重试/永久失败/空队列/租约回收；集成测试覆盖
+`enqueue → claim → 租约过期接管 → complete`、退避与最大重试；微型小说端到端测试由 worker
+从入队跑到 ready，checkpoint 记录到 `sync`。
+
+**取舍**：数据库队列不提供跨主机自动扩缩容、优先级路由和现成的任务监控 UI。当前单机规模用不上；
+`FOR UPDATE SKIP LOCKED` + 租约的语义足够，且省掉一整套中间件的部署与凭证管理。
 
 ### 13.3 重排的定位与优化
 
@@ -559,7 +583,7 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 | G | 多书规模化基线 + meta 路由诊断 | 已完成 |
 | **H（M1）** | **组装层 `/assemble` 与 `build_reference_prompt`：让"拼接完成的提示词"正式可用** | 已完成 |
 | **I（M2）** | **stdio MCP：以写作目标为主入口，附组装 skill 与使用说明** | 已完成第一版 |
-| J（M3） | 长任务可靠性：索引 worker/守护进程、断点续跑、重试看门狗；重排缓存与异步化 | 待开始 |
+| J（M3） | 长任务可靠性：in-process worker + PG 队列/租约/重试/checkpoint | in-process 已实现；独立进程与取消 UI 待做 |
 | K（M4） | meta 标注与词表整改、路由形态评估，并回归多书基线 | 查询锚点 + 向量重建已完成；词表收敛待做 |
 | L（M5） | 四书公开快照 | 本版完成导出 |
 | M | 云服务器 / 托管云形态 | 未来，暂不启动（当前用本机 + Cloudflare Tunnel） |
@@ -596,5 +620,5 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
-| v0.9 | 2026-11-13 | 多书聚合升为最高层接口；交付形态改为本机 + Cloudflare Tunnel，云服务列为未来可能实现；MCP 定为交付重点但工具形态待定；组装层（prompt 可用）定为本期目标；新增长任务可靠性（索引守护进程/断点续跑/重试看门狗）与重排缓存/异步策略；meta 路由诊断与查询锚点修复；四书公开快照 |
+| v0.9 | 2026-11-16 | 多书聚合升为最高层接口；交付形态改为本机 + Cloudflare Tunnel，云服务列为未来可能实现；MCP 与组装层（prompt 可用）落地；meta 风格签名与向量重建；**索引长任务可靠性改为 PostgreSQL 队列 + in-process worker（租约/重试/checkpoint，无中间件）**；四书公开快照 |
 | v0.8 | 2026-09-24 | 单书检索、观察台、Reference Evaluation 定稿（[归档](archive/novel-rag-prd-v0.8-2026-09-24.md)） |

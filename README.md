@@ -178,6 +178,7 @@ uv run python -m app.db.migrate migrations/003_reference_evaluation.sql
 uv run python -m app.db.migrate migrations/004_query_parsing_cache.sql
 uv run python -m app.db.migrate migrations/005_scene_split_cache.sql
 uv run python -m app.db.migrate migrations/006_scene_quality_screen.sql
+uv run python -m app.db.migrate migrations/007_index_job_queue.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -186,6 +187,17 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 场景边界判断会按模型、提示词版本与输入内容缓存到 PostgreSQL；长篇索引中断后可复用已完成窗口。`SCENE_MIN_CHARS` 控制接受模型边界的最小场景长度。升级旧版本后，已有书籍需重新索引才能采用新的 EPUB 章节与场景切分结果。
 
 质量全筛在全部场景切分后运行，逐场景调用 LLM，并提供全书重复段落比例和最相近场景节选；极端重复的片段还会被明确规则兜底拦截。剔除的原文仍留在 PostgreSQL，以 `discarded` 独立计数，原因可在 Dashboard 中查看，不进入标注和 Qdrant；旧版本不会自动补筛，需重新索引。
+
+### 索引任务队列（无中间件）
+
+迁移 `007_index_job_queue.sql` 后，索引请求进入 PostgreSQL 队列，由进程内 worker 领取执行：租约、心跳、重试退避与阶段 checkpoint 全部在库里，不需要 Redis/Celery。开启方式：
+
+```bash
+# .env
+INDEX_WORKER_ENABLED=true
+```
+
+配置项包括 `INDEX_WORKER_POLL_SECONDS`、`INDEX_WORKER_HEARTBEAT_SECONDS`、`INDEX_WORKER_LEASE_SECONDS`、`INDEX_JOB_MAX_ATTEMPTS`、`INDEX_JOB_RETRY_BACKOFF_SECONDS`。worker 崩溃或 API 重启后，过期租约会被下一次启动回收，并从 `checkpoint.completed_stages` 之后继续；`split` 已完成时不会重新切分覆盖下游结果。未开启 worker 时，`POST /books/{book_id}/index` 保持旧的同步后台任务行为（测试与轻量调试用）。
 
 重复上传按文件 SHA-256 或相同书名与作者识别；未确认时返回现有书籍与下一版本号，不改动登记记录。确认后替换该书用于下一轮索引的源文件并启动索引；旧版 Scene 与向量仍按版本保留。版本号由当前版本递增，因此已有 v2 的书下一轮会生成 v3。
 
