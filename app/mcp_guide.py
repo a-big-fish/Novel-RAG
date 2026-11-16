@@ -54,8 +54,15 @@ USAGE_GUIDE = """\
 - `plan_writing_query`：只把写作目标转成检索查询，不检索；用于调试或预览。
 - `build_reference_prompt`：进阶用法，直接给结构化 query，取拼装结果。
 - `get_scene`：按 `book_id`、`version`、`scene_id` 读取原文与标注。
-- `list_books`：查看可用书籍与当前版本。
+- `list_books`：查看可用书籍与当前版本；不知道 `book_ids` 时可以省略该参数或先调用它。
+- `get_service_status`：检查 PostgreSQL、Qdrant、Ollama 与 LLM 配置是否就绪；接入调试第一步。
 - `get_usage_guide`：返回这份说明（MCP 资源 `novel-rag://usage-guide` 同内容）。
+
+## 延迟与重试
+
+首次未命中的查询需要调用外部 LLM 做需求解析，可能耗时数十秒到数分钟；解析结果会写入
+持久缓存，同一查询再次调用会明显更快。客户端应设置足够长的工具超时；失败时先调用
+`get_service_status` 看依赖状态，而不是反复重试。
 
 ## 什么时候会没有结果
 

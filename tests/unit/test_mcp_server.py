@@ -10,7 +10,8 @@ async def test_mcp_registers_core_tools():
     tools = {tool.name for tool in await mcp_server.mcp.list_tools()}
     assert {
         "search_writing_references", "plan_writing_query",
-        "build_reference_prompt", "get_scene", "list_books", "get_usage_guide",
+        "build_reference_prompt", "get_scene", "list_books",
+        "get_service_status", "get_usage_guide",
     } <= tools
 
 
@@ -21,6 +22,32 @@ def test_usage_guide_is_exposed_as_tool_and_matches_skill():
     assert "不要自己拼标签" in skill
     assert "search_writing_references" in USAGE_GUIDE
     assert "不要自己拼标签" in USAGE_GUIDE
+
+
+def test_list_books_uses_database_only(monkeypatch):
+    from contextlib import contextmanager
+
+    class FakeRepository:
+        def list_books(self):
+            return [{
+                "id": 1, "title": "书", "author": "", "status": "ready",
+                "current_version": 1, "total_scenes": 2, "selected_scenes": 1,
+            }]
+
+    @contextmanager
+    def fake_repository():
+        yield FakeRepository()
+
+    monkeypatch.setattr(mcp_server, "_repository", fake_repository)
+    monkeypatch.setattr(
+        mcp_server, "build_llm_client",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("read tools must not require an LLM")
+        ),
+    )
+    books = mcp_server._books_sync()
+    assert books[0]["book_id"] == 1
+    assert books[0]["title"] == "书"
 
 
 def test_plan_tool_only_builds_query():

@@ -79,8 +79,14 @@ description: 在写作前向 Novel-RAG MCP 索取高质量范本与可直接使�
 
 - `plan_writing_query`：只预览检索查询，不执行检索。
 - `build_reference_prompt`：进阶，直接给检索 query。
-- `list_books`：查看书库与版本。
+- `list_books`：查看书库与版本；不知道 `book_ids` 时可省略或先调用它。
+- `get_service_status`：检查数据库、Qdrant、Ollama、LLM 配置是否就绪；接入调试第一步。
 - `get_usage_guide`：返回服务端使用说明。
+
+## 延迟提醒
+
+首次未命中的查询会调用外部 LLM 做需求解析，可能数十秒到数分钟；解析结果有持久缓存，
+同一查询再次调用更快。客户端工具超时应设置得宽裕；失败先查 `get_service_status`。
 
 ## 不要做的事
 

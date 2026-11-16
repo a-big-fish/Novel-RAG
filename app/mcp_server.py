@@ -7,11 +7,13 @@ searches the book set and returns an assembled prompt or structured fragments.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from anyio import to_thread
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from app.clients.llm_client import build_llm_client
 from app.clients.ollama_client import OllamaClient
@@ -33,6 +35,30 @@ mcp = MCPServer(
 )
 
 
+def _tool_error(exc: Exception) -> ToolError:
+    """Expose anticipated failures to the client model instead of a crash."""
+
+    return ToolError(f"{type(exc).__name__}: {exc}")
+
+
+async def _guarded(call: Callable[[], Any]) -> Any:
+    try:
+        return await to_thread.run_sync(call)
+    except ToolError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - convert into an MCP tool error
+        raise _tool_error(exc) from exc
+
+
+def _guarded_sync(call: Callable[[], Any]) -> Any:
+    try:
+        return call()
+    except ToolError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise _tool_error(exc) from exc
+
+
 def _effective_settings(use_rerank: bool) -> Settings:
     base = get_settings()
     if not use_rerank:
@@ -45,7 +71,19 @@ def _effective_settings(use_rerank: bool) -> Settings:
 
 
 @contextmanager
-def _services(use_rerank: bool) -> Iterator[
+def _repository() -> Iterator[PostgresRepository]:
+    """Database-only context for read tools; no LLM or Ollama required."""
+
+    settings = get_settings()
+    database = PostgresDatabase.from_settings(settings)
+    try:
+        yield PostgresRepository(database)
+    finally:
+        database.dispose()
+
+
+@contextmanager
+def _search_services(use_rerank: bool) -> Iterator[
     tuple[PostgresRepository, WritingReferenceService, Settings]
 ]:
     settings = _effective_settings(use_rerank)
@@ -53,17 +91,17 @@ def _services(use_rerank: bool) -> Iterator[
     repository = PostgresRepository(database)
     qdrant = QdrantAdapter(settings=settings)
     ollama = OllamaClient(settings=settings)
-    llm = build_llm_client(settings)
-    reranker = (
-        RerankClient(
-            base_url=settings.ollama_url,
-            model=settings.ollama_rerank_model,
-            timeout_seconds=settings.rerank_timeout_seconds,
-            concurrency=settings.rerank_concurrency,
-        )
-        if settings.rerank_enabled else None
-    )
+    llm = None
+    reranker = None
     try:
+        llm = build_llm_client(settings)
+        if settings.rerank_enabled:
+            reranker = RerankClient(
+                base_url=settings.ollama_url,
+                model=settings.ollama_rerank_model,
+                timeout_seconds=settings.rerank_timeout_seconds,
+                concurrency=settings.rerank_concurrency,
+            )
         parser = QueryParser(repository, llm, settings)
         retriever = Retriever(repository, qdrant, ollama, parser, settings)
         searcher = MultiBookSearcher(repository, retriever, settings, reranker)
@@ -71,7 +109,8 @@ def _services(use_rerank: bool) -> Iterator[
     finally:
         if reranker is not None:
             reranker.close()
-        llm.close()
+        if llm is not None:
+            llm.close()
         ollama.close()
         qdrant.close()
         database.dispose()
@@ -90,7 +129,7 @@ def _search_sync(
     use_rerank: bool,
     query: str | None = None,
 ) -> dict[str, Any]:
-    with _services(use_rerank) as (repository, service, _settings):
+    with _search_services(use_rerank) as (repository, service, _settings):
         return service.search(
             writing_goal=writing_goal,
             outline_context=outline_context,
@@ -105,7 +144,7 @@ def _search_sync(
 
 
 def _scene_sync(book_id: int, version: int, scene_id: int) -> dict[str, Any]:
-    with _services(False) as (repository, _service, _settings):
+    with _repository() as repository:
         scene = repository.get_scene(scene_id)
         if (scene is None or int(scene["book_id"]) != book_id
                 or int(scene["version"]) != version):
@@ -134,7 +173,7 @@ def _scene_sync(book_id: int, version: int, scene_id: int) -> dict[str, Any]:
 
 
 def _books_sync() -> list[dict[str, Any]]:
-    with _services(False) as (repository, _service, _settings):
+    with _repository() as repository:
         return [
             {
                 "book_id": int(book["id"]),
@@ -147,6 +186,62 @@ def _books_sync() -> list[dict[str, Any]]:
             }
             for book in repository.list_books()
         ]
+
+
+def _status_sync() -> dict[str, Any]:
+    settings = get_settings()
+    status: dict[str, Any] = {
+        "postgres": "unknown",
+        "qdrant": "unknown",
+        "ollama": "unknown",
+        "llm": "configured" if (
+            settings.llm_base_url and settings.llm_model
+        ) else "missing configuration",
+        "index_worker_enabled": settings.index_worker_enabled,
+        "ready_books": 0,
+        "books": [],
+    }
+    try:
+        database = PostgresDatabase.from_settings(settings)
+        try:
+            database.ping()
+            repository = PostgresRepository(database)
+            books = repository.list_books()
+            status["postgres"] = "ok"
+            status["ready_books"] = sum(
+                1 for book in books
+                if str(book["status"]) == "ready"
+                and int(book["current_version"] or 0) > 0
+            )
+            status["books"] = [
+                {"book_id": int(book["id"]), "title": book["title"],
+                 "status": book["status"],
+                 "current_version": int(book["current_version"] or 0)}
+                for book in books
+            ]
+        finally:
+            database.dispose()
+    except Exception as exc:  # noqa: BLE001
+        status["postgres"] = f"error: {exc}"
+    try:
+        qdrant = QdrantAdapter(settings=settings)
+        try:
+            qdrant.ping()
+            status["qdrant"] = "ok"
+        finally:
+            qdrant.close()
+    except Exception as exc:  # noqa: BLE001
+        status["qdrant"] = f"error: {exc}"
+    try:
+        ollama = OllamaClient(settings=settings)
+        try:
+            ollama.ping()
+            status["ollama"] = "ok"
+        finally:
+            ollama.close()
+    except Exception as exc:  # noqa: BLE001
+        status["ollama"] = f"error: {exc}"
+    return status
 
 
 @mcp.tool()
@@ -168,19 +263,17 @@ async def search_writing_references(
     prompt (default) and/or structured fragments. It never generates prose.
     """
 
-    return await to_thread.run_sync(
-        lambda: _search_sync(
-            writing_goal=writing_goal,
-            outline_context=outline_context,
-            constraints=constraints,
-            book_ids=book_ids,
-            output=output,
-            budget_chars=budget_chars,
-            max_scenes=max_scenes,
-            book_quota=book_quota,
-            use_rerank=use_rerank,
-        )
-    )
+    return await _guarded(lambda: _search_sync(
+        writing_goal=writing_goal,
+        outline_context=outline_context,
+        constraints=constraints,
+        book_ids=book_ids,
+        output=output,
+        budget_chars=budget_chars,
+        max_scenes=max_scenes,
+        book_quota=book_quota,
+        use_rerank=use_rerank,
+    ))
 
 
 @mcp.tool()
@@ -191,12 +284,12 @@ def plan_writing_query(
 ) -> dict[str, Any]:
     """Preview the retrieval query built from a writing brief without searching."""
 
-    return request_planner.plan_writing_query(
+    return _guarded_sync(lambda: request_planner.plan_writing_query(
         writing_goal=writing_goal,
         outline_context=outline_context,
         constraints=constraints,
         max_chars=get_settings().query_max_chars,
-    )
+    ))
 
 
 @mcp.tool()
@@ -212,34 +305,40 @@ async def build_reference_prompt(
 ) -> dict[str, Any]:
     """Advanced: use a ready-made retrieval query and return assembled output."""
 
-    return await to_thread.run_sync(
-        lambda: _search_sync(
-            writing_goal=task or query,
-            outline_context="",
-            constraints=None,
-            book_ids=book_ids,
-            output=output,
-            budget_chars=budget_chars,
-            max_scenes=max_scenes,
-            book_quota=book_quota,
-            use_rerank=use_rerank,
-            query=query,
-        )
-    )
+    return await _guarded(lambda: _search_sync(
+        writing_goal=task or query,
+        outline_context="",
+        constraints=None,
+        book_ids=book_ids,
+        output=output,
+        budget_chars=budget_chars,
+        max_scenes=max_scenes,
+        book_quota=book_quota,
+        use_rerank=use_rerank,
+        query=query,
+    ))
 
 
 @mcp.tool()
 async def get_scene(book_id: int, version: int, scene_id: int) -> dict[str, Any]:
     """Read one scene with its annotation from the archive layer."""
 
-    return await to_thread.run_sync(_scene_sync, book_id, version, scene_id)
+    return await _guarded(lambda: _scene_sync(book_id, version, scene_id))
 
 
 @mcp.tool()
-async def list_books() -> list[dict[str, Any]]:
+async def list_books() -> dict[str, Any]:
     """List indexed books and their current versions."""
 
-    return await to_thread.run_sync(_books_sync)
+    books = await _guarded(_books_sync)
+    return {"count": len(books), "books": books}
+
+
+@mcp.tool()
+async def get_service_status() -> dict[str, Any]:
+    """Check database, Qdrant, Ollama and LLM configuration before searching."""
+
+    return await _guarded(_status_sync)
 
 
 @mcp.tool()
@@ -266,7 +365,7 @@ def writing_reference_brief(writing_goal: str) -> str:
         f"写作目标：{writing_goal}\n\n"
         "建议参数：writing_goal（上述目标）、outline_context（该场景在细纲中的上下文）、"
         "constraints（情绪/句式/视角/避免项）。默认 output=prompt，"
-        "拿到 prompt.text 后直接交给写作模型。\n\n"
+        "拿到 prompt.text 后直接交给写作模型；服务状态可用 get_service_status 检查。\n\n"
         f"完整说明：\n{USAGE_GUIDE}"
     )
 
