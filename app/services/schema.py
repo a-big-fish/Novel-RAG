@@ -45,6 +45,21 @@ class SceneAnnotation(BaseModel):
     narrative_func: str = Field(min_length=1, max_length=64)
 
 
+class StyleSignature(BaseModel):
+    """Concrete, scene-specific style features used to rebuild meta vectors.
+
+    The generic ``style_tags`` vocabulary collapsed the meta-dense space; this
+    signature forces the model to cite devices and details that actually
+    distinguish one scene from another.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    style_signature: str = Field(min_length=30, max_length=400)
+    distinctive_devices: list[str] = Field(min_length=2, max_length=6)
+    retrieval_hooks: list[str] = Field(min_length=2, max_length=8)
+
+
 class MappedAnnotation(BaseModel):
     summary: str
     style_summary: str

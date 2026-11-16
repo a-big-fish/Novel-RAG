@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from app.clients.ollama_client import OllamaClient
@@ -8,10 +9,40 @@ from app.db.postgres import PostgresRepository
 from app.utils.text import bounded_sample
 
 
+def _style_signature(scene: dict[str, Any]) -> dict[str, Any] | None:
+    meta = scene.get("meta_json")
+    if isinstance(meta, str):
+        try:
+            meta = json.loads(meta)
+        except ValueError:
+            meta = None
+    if isinstance(meta, dict):
+        signature = meta.get("style_v1")
+        if isinstance(signature, dict) and str(signature.get("style_signature", "")).strip():
+            return signature
+    return None
+
+
 def build_meta_text(scene: dict[str, Any]) -> str:
     def joined(name: str) -> str:
         value = scene.get(name) or []
         return "、".join(str(item) for item in value)
+
+    signature = _style_signature(scene)
+    if signature is not None:
+        hooks = "、".join(str(item) for item in signature.get("retrieval_hooks") or [])
+        devices = "、".join(str(item) for item in signature.get("distinctive_devices") or [])
+        return "\n".join(
+            (
+                f"风格签名：{signature['style_signature']}",
+                f"辨识特征：{hooks}",
+                f"具体手法：{devices}",
+                f"使用提示：{scene.get('usage_hint', '')}",
+                f"写作技法：{joined('technique')}",
+                f"意象：{joined('key_images')}",
+                f"叙事功能：{scene.get('narrative_func', '')}",
+            )
+        )
 
     return "\n".join(
         (

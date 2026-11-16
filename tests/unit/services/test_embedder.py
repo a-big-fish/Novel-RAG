@@ -44,6 +44,29 @@ def test_build_meta_text_excludes_summary() -> None:
     assert "风格" in text
 
 
+def test_build_meta_text_prefers_concrete_style_signature() -> None:
+    text = build_meta_text(
+        {
+            "meta_json": {
+                "style_v1": {
+                    "style_signature": "用磁带机串联两代人的记忆，短句收尾不解释",
+                    "distinctive_devices": ["磁带机作为线索物件", "三段对话逐段缩短"],
+                    "retrieval_hooks": ["磁带机串联", "三问三答递进"],
+                }
+            },
+            "usage_hint": "适合参考物件驱动",
+            "technique": ["foreshadow"],
+            "key_images": ["磁带"],
+            "narrative_func": "reveal",
+            "style_summary": "泛泛的克制短句",
+        }
+    )
+    assert "风格签名：用磁带机串联两代人的记忆" in text
+    assert "辨识特征：磁带机串联、三问三答递进" in text
+    assert "泛泛的克制短句" not in text
+    assert "写作技法：foreshadow" in text
+
+
 def test_embed_scene_returns_three_dense_vectors() -> None:
     repository = FakeRepository()
     ollama = FakeOllama()
