@@ -206,16 +206,23 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ### 检索质量基线
 
-- 多书规模化基线（含《百年孤独》，4 本书、28 条单书探针 + 4 条多书聚合探针）：[`reports/retrieval-baseline-multi-book-2026-11-13.md`](reports/retrieval-baseline-multi-book-2026-11-13.md)。单书 RRF Hit@5 为 27/28；剧情摘要 28/28、原文语义 27/28、风格与技法 24/28；多书聚合 4/4 查询成功并覆盖全部书单书籍，平均约 4.6 s；解析降级 0。
-- 风格与技法路由诊断（含向量空间塌缩与标签对齐证据）：[`reports/meta-route-diagnosis-2026-11-13.md`](reports/meta-route-diagnosis-2026-11-13.md)。该路由的查询锚点修复把命中从 9/28 提升到 24/28。
+- 多书规模化基线（含《百年孤独》，4 本书、28 条单书探针 + 4 条多书聚合探针）：[`reports/retrieval-baseline-multi-book-2026-11-13.md`](reports/retrieval-baseline-multi-book-2026-11-13.md)。单书 RRF Hit@5 为 28/28；剧情摘要 28/28、原文语义 27/28、风格与技法 25/28；多书聚合 4/4 查询成功并覆盖全部书单书籍，平均约 4.2 s；解析降级 0。
+- 风格与技法路由诊断（查询构造 + 向量空间塌缩证据）：[`reports/meta-route-diagnosis-2026-11-13.md`](reports/meta-route-diagnosis-2026-11-13.md)。查询锚点修复把命中从 9/28 提到 24/28。
+- meta 向量重建（260 个场景、0 失败，书内余弦 0.81→0.69）：[`reports/meta-vector-rebuild-2026-11-16.md`](reports/meta-vector-rebuild-2026-11-16.md)。重建后该路由 25/28，RRF 28/28。
 - 早期单书基线（《马之途》10 条探针）：[`reports/archive/retrieval-baseline-ma-zhitu-2026-09-29.md`](reports/archive/retrieval-baseline-ma-zhitu-2026-09-29.md)。
 
-可选重排在 5 条候选上耗时约 135 s，且重排本身是高耗时任务，暂不进入实时写作链路；优化方向（分数缓存、后台预计算、超时回退）见 PRD §13.3。
+可选重排在 5 条候选上耗时约 144 s，且重排本身是高耗时任务，暂不进入实时写作链路；优化方向（分数缓存、后台预计算、超时回退）见 PRD §13.3。
 
 复现：
 
 ```bash
 uv run python -B -m tests.real.run_retrieval_baseline
+```
+
+meta 向量重建（风格签名 → 只重嵌入 `meta-dense`，幂等）：
+
+```bash
+uv run python -B -m scripts.rebuild_meta_vectors --book-ids 10 43 44 86 --workers 10
 ```
 
 在全新 Compose 数据卷中启动并完成迁移后导入：
