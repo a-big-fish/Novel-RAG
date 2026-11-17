@@ -128,3 +128,48 @@ def test_worker_reclaims_expired_leases_on_start():
     worker.start()
     worker.stop()
     assert repository.reclaimed == 2
+
+
+def test_poll_reclaims_leases_that_expire_after_start():
+    class Repository(FakeRepository):
+        scans = 0
+
+        def reclaim_expired_index_jobs(self):
+            self.scans += 1
+            if self.scans == 2:
+                self.job = job()
+            return 0
+
+    repository = Repository(None)
+    worker = build(repository, FakeIndexer())
+    assert worker.process_one() is False
+    assert worker.process_one() is True
+    assert repository.completed["job_id"] == 11
+
+
+def test_storage_proxy_rejects_old_owner_after_takeover():
+    from contextlib import contextmanager
+    from app.services.index_worker import LeaseProtected
+    import pytest
+
+    class Storage:
+        writes = 0
+
+        def upsert_scene_points(self):
+            self.writes += 1
+
+    owner = ["first"]
+
+    @contextmanager
+    def guard():
+        if owner[0] != "first":
+            raise StorageError("index job lease lost")
+        yield
+
+    storage = Storage()
+    protected = LeaseProtected(storage, guard)
+    protected.upsert_scene_points()
+    owner[0] = "second"
+    with pytest.raises(StorageError, match="lease lost"):
+        protected.upsert_scene_points()
+    assert storage.writes == 1

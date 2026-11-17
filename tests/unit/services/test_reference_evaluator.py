@@ -151,3 +151,32 @@ def test_evaluation_failure_is_not_archived() -> None:
     final = repository.updates[-1][1]
     assert final["reference_status"] == "evaluation_failed"
     assert "service unavailable" in final["error_message"]
+
+
+def test_resume_retries_interrupted_and_failed_scenes_and_counts_settled():
+    class Repository(FakeRepository):
+        def __init__(self):
+            super().__init__()
+            self.rows = [_scene(id=i, text=f"场景{i}", reference_status=status) for i, status in enumerate(
+                ["selected", "archived", "evaluating", "evaluation_failed", "unevaluated", "discarded"], 1
+            )]
+
+        def list_scenes(self, *args, **kwargs):
+            return self.rows
+
+    repo = Repository()
+    llm = FakeLLM(_evaluation("selected"))
+    stats = _evaluator(repo, llm).evaluate_book(1, 2)
+    assert stats == {"total": 5, "selected": 4, "archived": 1, "evaluation_failed": 0}
+    assert len(llm.calls) == 3
+    assert {scene_id for scene_id, _ in repo.updates} == {3, 4, 5}
+
+
+def test_retry_still_reports_failed_evaluation():
+    class Repository(FakeRepository):
+        def list_scenes(self, *args, **kwargs):
+            return [_scene(reference_status="evaluation_failed")]
+
+    stats = _evaluator(Repository(), FakeLLM(error=RuntimeError("timeout"))).evaluate_book(1, 2)
+    assert stats["evaluation_failed"] == 1
+    assert stats["selected"] == 0
