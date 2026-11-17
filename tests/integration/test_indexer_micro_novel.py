@@ -302,6 +302,20 @@ def test_index_worker_completes_queued_job(tmp_path: Path) -> None:
         book = repository.get_book(book_id)
         assert book is not None and book["status"] == "ready"
         assert book["current_version"] == 1
+        # Resume an already-evaluated version: preserve totals rather than
+        # replacing them with the number of unevaluated rows (zero).
+        resume_indexer = factory(repository)
+        # The worker owns and closes its clients after completing the job.
+        resume_indexer.qdrant = QdrantAdapter(
+            QdrantClient(location=":memory:"), settings=settings, dimension=4,
+        )
+        resumed = resume_indexer.run(
+            book_id, version=1, completed_stages={"split", "screen", "evaluate"},
+        )
+        actual_selected = len(repository.list_scenes(book_id, 1, reference_status="selected"))
+        assert resumed["selected_scenes"] == actual_selected
+        assert resumed["indexed_scenes"] == actual_selected
+        assert resumed["selected_scenes"] + resumed["archived_scenes"] + resumed["discarded_scenes"] == resumed["scenes"]
     finally:
         if book_id is not None:
             with database.engine.begin() as connection:

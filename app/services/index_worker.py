@@ -12,7 +12,8 @@ import logging
 import os
 import socket
 from collections.abc import Callable
-from threading import Event, Thread
+from contextlib import contextmanager
+from threading import Event, RLock, Thread
 from typing import Any
 from uuid import uuid4
 
@@ -24,6 +25,7 @@ from app.utils.errors import (
     ModelInputTooLargeError,
     SourceValidationError,
     TextProcessingError,
+    StorageError,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,24 @@ PERMANENT_ERRORS = (
     TextProcessingError,
     ModelInputTooLargeError,
 )
+
+
+class LeaseProtected:
+    """Fence all pipeline storage operations, including nested service writes."""
+
+    def __init__(self, target: Any, guard: Callable) -> None:
+        self._target = target
+        self._guard = guard
+
+    def __getattr__(self, name: str) -> Any:
+        value = getattr(self._target, name)
+        if not callable(value) or name == "close":
+            return value
+
+        def protected(*args: Any, **kwargs: Any) -> Any:
+            with self._guard():
+                return value(*args, **kwargs)
+        return protected
 
 
 class IndexWorker:
@@ -99,8 +119,9 @@ class IndexWorker:
     def process_one(self) -> bool:
         """Lease and execute one queued job. Returns whether a job was found."""
 
+        self.repository.reclaim_expired_index_jobs()
         job = self.repository.claim_index_job(
-            worker_id=self.worker_id,
+            worker_id=f"{self.worker_id}-{uuid4().hex}",
             lease_seconds=self.settings.index_worker_lease_seconds,
         )
         if job is None:
@@ -125,7 +146,7 @@ class IndexWorker:
                 break
             if not self.repository.heartbeat_index_job(
                 int(job["id"]),
-                worker_id=self.worker_id,
+                worker_id=job.get("worker_id") or self.worker_id,
                 lease_seconds=self.settings.index_worker_lease_seconds,
             ):
                 logger.warning(
@@ -148,6 +169,17 @@ class IndexWorker:
 
     def _run_job(self, job: dict[str, Any], holder: dict[str, Any]) -> None:
         indexer: Indexer | None = None
+        owner = job.get("worker_id") or self.worker_id
+        lock = RLock()
+
+        @contextmanager
+        def guard():
+            with lock:
+                if self._stop.is_set():
+                    raise StorageError("index worker stopped")
+                with self.repository.index_job_lease(int(job["id"]), owner):
+                    yield
+
         try:
             book = self.repository.get_book(int(job["book_id"]))
             if book is None:
@@ -162,6 +194,7 @@ class IndexWorker:
                 int(job["id"]),
                 {"target_version": target_version, "completed_stages": stages},
                 stage="starting",
+                worker_id=owner,
             )
 
             def on_stage_complete(stage: str) -> None:
@@ -172,9 +205,12 @@ class IndexWorker:
                     {"target_version": target_version,
                      "completed_stages": stages},
                     stage=stage,
+                    worker_id=owner,
                 )
 
-            indexer = self.indexer_factory(self.repository)
+            indexer = self.indexer_factory(LeaseProtected(self.repository, guard))
+            if hasattr(indexer, "qdrant"):
+                indexer.qdrant = LeaseProtected(indexer.qdrant, guard)
             result = indexer.run(
                 int(job["book_id"]),
                 version=target_version,
@@ -182,7 +218,7 @@ class IndexWorker:
                 on_stage_complete=on_stage_complete,
             )
             completed = self.repository.complete_index_job(
-                int(job["id"]), worker_id=self.worker_id, result=result,
+                int(job["id"]), worker_id=owner, result=result,
             )
             if not completed:
                 logger.warning(
@@ -194,7 +230,7 @@ class IndexWorker:
             holder["error"] = exc
             retry_in = self._retry_delay(job, exc)
             status = self.repository.fail_index_job(
-                int(job["id"]), worker_id=self.worker_id,
+                int(job["id"]), worker_id=owner,
                 error=str(exc), retry_in_seconds=retry_in,
             )
             logger.warning(

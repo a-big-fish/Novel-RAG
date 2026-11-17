@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -990,7 +991,6 @@ class PostgresRepository:
     def heartbeat_index_job(
         self, job_id: int, *, worker_id: str, lease_seconds: int,
     ) -> bool:
-        now = _utc_now()
         with self.engine.begin() as connection:
             result = connection.execute(
                 update(index_jobs)
@@ -998,17 +998,18 @@ class PostgresRepository:
                     index_jobs.c.id == job_id,
                     index_jobs.c.worker_id == worker_id,
                     index_jobs.c.status.in_(("leased", "running")),
+                    index_jobs.c.lease_expires_at > func.clock_timestamp(),
                 )
                 .values(
-                    heartbeat_at=now,
-                    lease_expires_at=now + timedelta(seconds=lease_seconds),
+                    heartbeat_at=func.clock_timestamp(),
+                    lease_expires_at=func.clock_timestamp() + timedelta(seconds=lease_seconds),
                 )
             )
         return result.rowcount == 1
 
     def update_index_job_checkpoint(
         self, job_id: int, checkpoint: Mapping[str, Any],
-        *, stage: str | None = None,
+        *, worker_id: str | None = None, stage: str | None = None,
         total_items: int | None = None, done_items: int | None = None,
     ) -> None:
         values: dict[str, Any] = {"checkpoint": dict(checkpoint)}
@@ -1019,9 +1020,29 @@ class PostgresRepository:
         if done_items is not None:
             values["done_items"] = done_items
         with self.engine.begin() as connection:
+            if worker_id is not None:
+                self._lock_index_lease(connection, job_id, worker_id)
             connection.execute(
                 update(index_jobs).where(index_jobs.c.id == job_id).values(**values)
             )
+
+    def _lock_index_lease(self, connection: Any, job_id: int, worker_id: str) -> None:
+        row = connection.execute(
+            select(index_jobs).where(index_jobs.c.id == job_id).with_for_update()
+        ).mappings().first()
+        if (row is None or row["worker_id"] != worker_id
+                or row["status"] not in {"leased", "running"}
+                or row["lease_expires_at"] is None
+                or row["lease_expires_at"] <= _utc_now()):
+            raise StorageError("index job lease lost")
+
+    @contextmanager
+    def index_job_lease(self, job_id: int, worker_id: str):
+        # Hold the job row until the protected DB/Qdrant operation finishes.
+        # A takeover must wait, so an old write cannot overlap the new owner.
+        with self.engine.begin() as connection:
+            self._lock_index_lease(connection, job_id, worker_id)
+            yield
 
     def complete_index_job(
         self, job_id: int, *, worker_id: str, result: Mapping[str, Any] | None = None,
@@ -1033,7 +1054,11 @@ class PostgresRepository:
                 .where(index_jobs.c.id == job_id)
                 .with_for_update()
             ).mappings().first()
-            if row is None or row["worker_id"] != worker_id:
+            now = _utc_now()
+            if (row is None or row["worker_id"] != worker_id
+                    or row["status"] not in {"leased", "running"}
+                    or row["lease_expires_at"] is None
+                    or row["lease_expires_at"] <= now):
                 return False
             checkpoint = dict(row["checkpoint"] or {})
             if result is not None:
@@ -1063,8 +1088,14 @@ class PostgresRepository:
                 .where(index_jobs.c.id == job_id)
                 .with_for_update()
             ).mappings().first()
+            now = _utc_now()
             if row is None:
                 raise StorageError(f"index job not found: {job_id}")
+            if (row["worker_id"] != worker_id
+                    or row["status"] not in {"leased", "running"}
+                    or row["lease_expires_at"] is None
+                    or row["lease_expires_at"] <= now):
+                return "lease_lost"
             attempts = int(row["attempts"] or 0)
             max_attempts = int(row["max_attempts"] or 1)
             can_retry = retry_in_seconds is not None and attempts < max_attempts

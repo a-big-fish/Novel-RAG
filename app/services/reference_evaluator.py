@@ -150,15 +150,17 @@ class ReferenceEvaluator:
         rows = self.repository.list_scenes(
             book_id,
             version,
-            reference_status="unevaluated",
         )
+        rows = [row for row in rows if row["reference_status"] != "discarded"]
+        settled = [row for row in rows if row["reference_status"] in {"selected", "archived"}]
+        rows = [row for row in rows if row["reference_status"] not in {"selected", "archived"}]
         if limit is not None:
             rows = rows[:limit]
         scenes_input = [dict(row) for row in rows]
         stats = {
-            "total": len(scenes_input),
-            "selected": 0,
-            "archived": 0,
+            "total": len(scenes_input) + len(settled),
+            "selected": sum(row["reference_status"] == "selected" for row in settled),
+            "archived": sum(row["reference_status"] == "archived" for row in settled),
             "evaluation_failed": 0,
         }
         logger.info(

@@ -295,6 +295,12 @@ POST /api/v1/search/multi/stream
 
 ## 六、上下文拼接与提示词组装契约
 
+### 后续要求：调用方预算与输入超限
+
+MCP 与 HTTP `/assemble` 的 `budget_chars` 均为可选参数，省略时使用服务端 `ASSEMBLY_BUDGET_CHARS`；该值是字符预算，不是模型 token 上下文窗口。当前预算控制会缩减或移除参考素材，但任务、大纲、约束和模板本身超过预算时，仍可能超出该值。
+
+后续需设计并实现输入超限策略：优先保留写作任务与明确约束，对可缩减的大纲按可追溯规则裁剪并报告；必要输入已超限时返回明确的预算不足结果。若支持 token 限制，需要明确目标模型与计数方式，不得将字符数直接当 token 数。本轮仅登记需求，不新增截断逻辑，也不要求调用方必须传入上下文长度。
+
 本章是 v0.9 新增的**对外契约**，已随 M1 落地（`app/services/assembler.py`、`app/prompts/assembly/v1.py`、`POST /api/v1/assemble`、MCP `search_writing_references`）。目标：让调用方不必理解 Scene 切分与四路检索细节，也能拿到可用的写作参考上下文。
 
 ### 6.1 组装输入

@@ -68,6 +68,19 @@ def test_queue_lease_takeover_and_completion() -> None:
         assert takeover is not None
         assert takeover["id"] == job["id"]
         assert takeover["attempts"] == 2
+        from app.utils.errors import StorageError
+        with pytest.raises(StorageError, match="lease lost"):
+            repository.update_index_job_checkpoint(
+                job["id"], {"wrong": True}, worker_id="worker-a",
+            )
+        with pytest.raises(StorageError, match="lease lost"):
+            with repository.index_job_lease(job["id"], "worker-a"):
+                pytest.fail("stale worker entered protected storage operation")
+        assert repository.fail_index_job(
+            job["id"], worker_id="worker-a", error="late failure",
+            retry_in_seconds=30,
+        ) == "lease_lost"
+        assert repository.get_index_job(job["id"])["worker_id"] == "worker-b"
         assert repository.complete_index_job(
             job["id"], worker_id="worker-b", result={"ok": True},
         )

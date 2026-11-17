@@ -126,9 +126,9 @@ class Annotator:
         rows = self.repository.list_scenes(
             book_id,
             version,
-            annotate_status="pending",
             reference_status="selected",
         )
+        rows = [row for row in rows if row["annotate_status"] != "annotated"]
         if limit is not None:
             rows = rows[:limit]
         scenes_input = [dict(row) for row in rows]
