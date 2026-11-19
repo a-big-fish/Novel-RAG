@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from app.config import Settings
 from app.services.query_parser import QueryParser
+from app.utils.errors import StorageError
 
 
 class FakeRepository:
@@ -79,6 +80,28 @@ def test_query_parser_falls_back_on_invalid_output():
     result = parser.parse("雨夜追逐")
     assert result.fallback is True
     assert result.summary_query == ""
+
+
+def test_query_parser_retries_without_reasoning_on_empty_content():
+    class RetryLLM(FakeLLM):
+        def __init__(self):
+            super().__init__({"summary_query": "ok"})
+            self.reasoning_seen = []
+
+        def request_json_with_options(self, *, options=None, **_):
+            self.calls += 1
+            self.options.append(options)
+            self.reasoning_seen.append(options.reasoning_effort)
+            if options.reasoning_effort:
+                raise StorageError("LLM returned a non-text response")
+            return self.output
+
+    llm = RetryLLM()
+    settings = Settings(query_llm_reasoning_effort="minimal")
+    result = QueryParser(FakeRepository(), llm, settings).parse("雨夜追逐")
+    assert result.fallback is False
+    assert llm.reasoning_seen == ["minimal", None]
+    assert llm.options[-1].max_tokens >= 600
 
 
 def test_query_parser_uses_latency_first_options():

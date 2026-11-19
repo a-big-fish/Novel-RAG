@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     query_llm_model: str = ""
     query_llm_temperature: float = 0.0
     query_llm_max_tokens: int = Field(default=400, ge=64, le=4000)
-    query_llm_reasoning_effort: str = "minimal"
+    query_llm_reasoning_effort: str = ""
     query_llm_timeout_seconds: float = Field(default=45.0, ge=5, le=600)
     query_llm_max_retries: int = Field(default=0, ge=0, le=3)
     query_llm_json_response_format: bool = True

@@ -61,10 +61,24 @@ class QueryParser:
             model=self.settings.query_llm_model or None,
             temperature=self.settings.query_llm_temperature,
             max_tokens=self.settings.query_llm_max_tokens,
-            reasoning_effort=self.settings.query_llm_reasoning_effort or None,
+            reasoning_effort=self.settings.query_llm_reasoning_effort.strip() or None,
             timeout_seconds=self.settings.query_llm_timeout_seconds,
             max_retries=self.settings.query_llm_max_retries,
             json_response_format=self.settings.query_llm_json_response_format,
+        )
+
+    def _call_llm(self, options: LLMRequestOptions, *, system_prompt: str,
+                  user_prompt: str) -> Any:
+        caller = getattr(self.llm, "request_json_with_options", None)
+        if caller is not None:
+            return caller(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                options=options,
+            )
+        return self.llm.request_json(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
         )
 
     def _fresh(self, created_at: Any) -> bool:
@@ -143,19 +157,34 @@ class QueryParser:
         )
         user_prompt = f"受控词表：\n{vocabulary_text}\n\n用户需求：\n{raw_intent}"
         started = perf_counter()
+        options = self._request_options()
         try:
-            caller = getattr(self.llm, "request_json_with_options", None)
-            if caller is not None:
-                output = caller(
-                    system_prompt=SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                    options=self._request_options(),
+            try:
+                output = self._call_llm(
+                    options, system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt,
                 )
-            else:
-                output = self.llm.request_json(
-                    system_prompt=SYSTEM_PROMPT,
-                    user_prompt=user_prompt,
-                )
+            except Exception as exc:  # noqa: BLE001 - retry only for empty output
+                if (options.reasoning_effort
+                        and "non-text response" in str(exc).lower()):
+                    logger.warning(
+                        "query_parse_retry_without_reasoning",
+                        extra={"model": self.llm.model},
+                    )
+                    output = self._call_llm(
+                        LLMRequestOptions(
+                            model=options.model,
+                            temperature=options.temperature,
+                            max_tokens=max(options.max_tokens or 400, 600),
+                            reasoning_effort=None,
+                            timeout_seconds=options.timeout_seconds,
+                            max_retries=options.max_retries,
+                            json_response_format=options.json_response_format,
+                        ),
+                        system_prompt=SYSTEM_PROMPT,
+                        user_prompt=user_prompt,
+                    )
+                else:
+                    raise
             if not isinstance(output, dict):
                 raise ValueError("query parser output is not an object")
             normalized: dict[str, Any] = {
