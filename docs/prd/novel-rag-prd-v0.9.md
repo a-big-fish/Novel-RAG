@@ -223,7 +223,7 @@ POST /api/v1/search/multi/stream
 
 ```text
 1. 校验书单与版本，固定本次请求的 (book_id, version) 集合
-2. 查询解析一次；使用 **latency-first** 参数（`reasoning_effort=minimal`、`max_tokens=400`、
+2. 查询解析一次；使用 **latency-first** 参数（默认省略 `reasoning_effort`、`max_tokens=400`、
    温度 0、超时 45 秒、不重试、`response_format=json_object`）；失败或超时立即退化为
    `raw_intent`，并把 fallback 结果缓存 6 小时，避免同一慢查询反复等待；成功结果照常持久缓存。
 3. 只执行一轮查询向量化：text / meta / summary 三路查询向量 + 稀疏查询
@@ -302,6 +302,10 @@ MCP 与 HTTP `/assemble` 的 `budget_chars` 均为可选参数，省略时使用
 后续需设计并实现输入超限策略：优先保留写作任务与明确约束，对可缩减的大纲按可追溯规则裁剪并报告；必要输入已超限时返回明确的预算不足结果。若支持 token 限制，需要明确目标模型与计数方式，不得将字符数直接当 token 数。本轮仅登记需求，不新增截断逻辑，也不要求调用方必须传入上下文长度。
 
 本章是 v0.9 新增的**对外契约**，已随 M1 落地（`app/services/assembler.py`、`app/prompts/assembly/v1.py`、`POST /api/v1/assemble`、MCP `search_writing_references`）。目标：让调用方不必理解 Scene 切分与四路检索细节，也能拿到可用的写作参考上下文。
+
+同一链路已在 Dashboard 的「写作参考」标签页可视化：输入写作需求、细纲与约束后，页面展示
+查询改写、四路召回、跨书聚合、提示词组装各阶段，并输出可复制的完整提示词、每条参考的原文节选、
+剧情摘要、文风、推荐原因，以及预算与舍弃统计。阶段事件由 `POST /api/v1/assemble/stream` 提供。
 
 ### 6.1 组装输入
 
@@ -395,11 +399,13 @@ v0.9 不新增必需表。沿用 v0.8 已实现的表结构：`books`、`chapter
 meta 查询的构造在 2026-11-13 修复为 **`raw_intent` 锚点 + canonical 标签**：诊断显示纯标签查询落在高度同质的 meta 向量空间中心，8 条 miss 探针全部无法进入 Top-5；加入需求锚点后该路由基线从 9/28 回升到 24/28（证据见第十章与 `reports/meta-route-diagnosis-2026-11-13.md`）。
 
 查询解析是检索链路里唯一同步调用 LLM 的步骤，按 **latency-first** 设计：默认
-`QUERY_LLM_REASONING_EFFORT=minimal`、`QUERY_LLM_MAX_TOKENS=400`、温度 0、
-`QUERY_LLM_TIMEOUT_SECONDS=45`、`QUERY_LLM_MAX_RETRIES=0`、`response_format=json_object`；
-超时或错误立即回退 `raw_intent`，并把 fallback 写入带 TTL 的缓存（默认 6 小时），同一慢查询
-不会反复阻塞。实测同一端点下解析通常 1–3 秒；此前的数分钟等待属于上游模型/网关的瞬时行为，
-现在由 45 秒超时兜底。需要更换更快的解析模型时设置 `QUERY_LLM_MODEL` 即可，不影响标注/评估模型。
+**省略** `reasoning_effort`（显式设 `minimal` 可能在部分网关触发思考并耗尽输出预算）、
+`QUERY_LLM_MAX_TOKENS=400`、温度 0、`QUERY_LLM_TIMEOUT_SECONDS=45`、
+`QUERY_LLM_MAX_RETRIES=0`、`response_format=json_object`；超时或错误立即回退 `raw_intent`，
+并把 fallback 写入带 TTL 的缓存（默认 6 小时），同一慢查询不会反复阻塞。若配置了 reasoning
+而模型返回空正文，解析器会自动去掉 reasoning 重试一次。实测同一端点下解析通常 1–3 秒；
+此前的数分钟等待属于上游模型/网关的瞬时行为，现在由 45 秒超时兜底。需要更换更快的解析模型时
+设置 `QUERY_LLM_MODEL` 即可，不影响标注/评估模型。
 
 ### 9.2 多书聚合
 
@@ -479,7 +485,7 @@ meta 向量重建的方法、重建前后书内余弦与复现命令见 [`report
 | Scene 直查 | `GET /api/v1/scenes/{scene_id}` | 已实现 |
 | 单书检索 | `POST /api/v1/books/{book_id}/search`、`POST /api/v1/books/{book_id}/search/stream` | 已实现（内部构件） |
 | **多书聚合（主接口）** | `POST /api/v1/search/multi`、`POST /api/v1/search/multi/stream` | 已实现 |
-| 写作参考组装 | `POST /api/v1/assemble` | 已实现 |
+| 写作参考组装 | `POST /api/v1/assemble`、`POST /api/v1/assemble/stream` | 已实现 |
 | Qdrant 直查 | `POST /api/v1/qdrant/collections/{collection}/points/search`、`GET .../points/{point_id}` | 已实现 |
 | MCP tools | `search_writing_references`、`plan_writing_query`、`build_reference_prompt`、`get_scene`、`list_books`、`get_usage_guide` | 已实现（stdio） |
 
@@ -500,7 +506,7 @@ POSTGRES_TEST_DB=novel_rag_test
 QUERY_LLM_MODEL=
 QUERY_LLM_TEMPERATURE=0
 QUERY_LLM_MAX_TOKENS=400
-QUERY_LLM_REASONING_EFFORT=minimal
+QUERY_LLM_REASONING_EFFORT=
 QUERY_LLM_TIMEOUT_SECONDS=45
 QUERY_LLM_MAX_RETRIES=0
 QUERY_LLM_JSON_RESPONSE_FORMAT=true

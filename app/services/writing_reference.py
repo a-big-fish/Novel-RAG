@@ -6,6 +6,7 @@ scene they want to write; they never assemble retrieval queries themselves.
 
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
 from app.config import Settings
@@ -13,6 +14,7 @@ from app.db.postgres import PostgresRepository
 from app.services.assembler import AssemblyOptions, assemble_search_result
 from app.services.multi_search import MultiBookSearchError, MultiBookSearcher
 from app.services.request_planner import plan_writing_query
+from app.services.retriever import ProgressCallback
 
 OUTPUT_FORMATS = ("prompt", "fragments", "both")
 
@@ -59,6 +61,7 @@ class WritingReferenceService:
         per_scene_chars: int | None = None,
         book_quota: int | None = None,
         query: str | None = None,
+        on_progress: ProgressCallback | None = None,
     ) -> dict[str, Any]:
         if output not in OUTPUT_FORMATS:
             raise WritingReferenceError(
@@ -98,6 +101,7 @@ class WritingReferenceService:
                 route_top_n=self.settings.query_route_top_n,
                 per_book_limit=self.settings.multi_search_per_book_limit,
                 global_limit=self.settings.multi_search_global_limit,
+                on_progress=on_progress,
             )
         except MultiBookSearchError as exc:
             raise WritingReferenceError(str(exc)) from exc
@@ -117,6 +121,14 @@ class WritingReferenceService:
             task = writing_goal.strip()
             if outline_context.strip():
                 task = f"{task}\n\n情节上下文：{outline_context.strip()}"
+            if on_progress:
+                on_progress("assembling", {
+                    "candidate_count": len(
+                        (result.get("final") or {}).get("items") or []
+                    ),
+                    "budget_chars": budget_chars or self.settings.assembly_budget_chars,
+                })
+            assembly_started = perf_counter()
             assembly = assemble_search_result(
                 result, self.repository, self.settings,
                 task=task,
@@ -139,6 +151,14 @@ class WritingReferenceService:
             response["budget"] = assembly["prompt"]["budget"]
             response["assembly_status"] = assembly["status"]
             response["dropped"] = assembly["dropped"]
+            if on_progress:
+                on_progress("assembling_complete", {
+                    "status": assembly["status"],
+                    "included": assembly["prompt"]["budget"]["included"],
+                    "dropped": assembly["prompt"]["budget"]["dropped"],
+                    "prompt_chars": assembly["prompt"]["char_count"],
+                    "latency_ms": round((perf_counter() - assembly_started) * 1000, 2),
+                })
         return response
 
 

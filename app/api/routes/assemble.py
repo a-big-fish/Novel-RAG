@@ -18,9 +18,10 @@ from app.clients.rerank_client import RerankClient
 from app.config import Settings
 from app.db.postgres import PostgresRepository
 from app.db.qdrant import QdrantAdapter
+from app.api.search_stream import search_stream
 from app.services.multi_search import MultiBookSearcher
 from app.services.query_parser import QueryParser
-from app.services.retriever import Retriever
+from app.services.retriever import ProgressCallback, Retriever
 from app.services.writing_reference import WritingReferenceError, WritingReferenceService
 
 router = APIRouter(prefix="/assemble", tags=["writing-reference"])
@@ -33,6 +34,7 @@ class AssembleRequest(BaseModel):
     book_ids: list[int] | None = None
     versions: dict[int, int] = Field(default_factory=dict)
     output: Literal["prompt", "fragments", "both"] = "prompt"
+    use_rerank: bool = False
     budget_chars: int | None = Field(default=None, ge=500, le=50000)
     max_scenes: int | None = Field(default=None, ge=1, le=50)
     per_scene_chars: int | None = Field(default=None, ge=100, le=10000)
@@ -51,28 +53,33 @@ class AssembleRequest(BaseModel):
         return self
 
 
-@router.post("")
-def assemble(
+def _run_assemble(
     payload: AssembleRequest,
-    repository: PostgresRepository = Depends(get_repository),
-    qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
-    ollama: OllamaClient = Depends(get_ollama_client),
-    llm: JsonLLMClient = Depends(get_query_llm_client),
-    settings: Settings = Depends(get_multi_search_settings),
+    repository: PostgresRepository,
+    qdrant: QdrantAdapter,
+    ollama: OllamaClient,
+    llm: JsonLLMClient,
+    settings: Settings,
+    on_progress: ProgressCallback | None = None,
 ) -> dict:
-    parser = QueryParser(repository, llm, settings)
-    retriever = Retriever(repository, qdrant, ollama, parser, settings)
+    # Workbench requests default to the fast aggregation path; rerank is opt-in
+    # because a single pass can take minutes.
+    effective = settings.model_copy(update={
+        "rerank_enabled": bool(payload.use_rerank and settings.rerank_enabled),
+    })
+    parser = QueryParser(repository, llm, effective)
+    retriever = Retriever(repository, qdrant, ollama, parser, effective)
     reranker = (
         RerankClient(
-            base_url=settings.ollama_url,
-            model=settings.ollama_rerank_model,
-            timeout_seconds=settings.rerank_timeout_seconds,
-            concurrency=settings.rerank_concurrency,
+            base_url=effective.ollama_url,
+            model=effective.ollama_rerank_model,
+            timeout_seconds=effective.rerank_timeout_seconds,
+            concurrency=effective.rerank_concurrency,
         )
-        if settings.rerank_enabled else None
+        if effective.rerank_enabled else None
     )
-    searcher = MultiBookSearcher(repository, retriever, settings, reranker)
-    service = WritingReferenceService(repository, searcher, settings)
+    searcher = MultiBookSearcher(repository, retriever, effective, reranker)
+    service = WritingReferenceService(repository, searcher, effective)
     try:
         return service.search(
             writing_goal=payload.writing_goal,
@@ -85,9 +92,43 @@ def assemble(
             max_scenes=payload.max_scenes,
             per_scene_chars=payload.per_scene_chars,
             book_quota=payload.book_quota,
+            on_progress=on_progress,
         )
-    except WritingReferenceError as exc:
-        raise HTTPException(503, str(exc)) from exc
     finally:
         if reranker is not None:
             reranker.close()
+
+
+@router.post("")
+def assemble(
+    payload: AssembleRequest,
+    repository: PostgresRepository = Depends(get_repository),
+    qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
+    ollama: OllamaClient = Depends(get_ollama_client),
+    llm: JsonLLMClient = Depends(get_query_llm_client),
+    settings: Settings = Depends(get_multi_search_settings),
+) -> dict:
+    try:
+        return _run_assemble(
+            payload, repository, qdrant, ollama, llm, settings,
+        )
+    except WritingReferenceError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@router.post("/stream")
+def assemble_stream(
+    payload: AssembleRequest,
+    repository: PostgresRepository = Depends(get_repository),
+    qdrant: QdrantAdapter = Depends(get_qdrant_adapter),
+    ollama: OllamaClient = Depends(get_ollama_client),
+    llm: JsonLLMClient = Depends(get_query_llm_client),
+    settings: Settings = Depends(get_multi_search_settings),
+):
+    try:
+        return search_stream(lambda publish: _run_assemble(
+            payload, repository, qdrant, ollama, llm, settings,
+            on_progress=publish,
+        ))
+    except WritingReferenceError as exc:
+        raise HTTPException(503, str(exc)) from exc

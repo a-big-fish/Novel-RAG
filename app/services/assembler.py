@@ -216,6 +216,9 @@ def assemble_search_result(
             "title": item["title"],
             "truncated": item["truncated"],
             "route_ranks": item["route_ranks"],
+            "summary": item["summary"],
+            "style_summary": item["style_summary"],
+            "usage_hint": item["usage_hint"],
         }
         for item in selected
     ]

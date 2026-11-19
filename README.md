@@ -69,6 +69,7 @@ uv run novel-rag-mcp
 同一份说明以三种形式提供：MCP 工具 `get_usage_guide`、MCP 资源 `novel-rag://usage-guide`，
 以及可安装的 skill：[`skills/novel-rag-writing/SKILL.md`](skills/novel-rag-writing/SKILL.md)。
 MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 6000，可通过 `budget_chars` 调整。
+同一链路也可以直接在 Dashboard 的“写作参考”标签页可视化试用。
 
 ### 第三方 AI 接入
 
@@ -113,10 +114,11 @@ MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 600
 ```
 
 接入后建议先让 AI 调 `get_service_status` 确认依赖，再调用 `search_writing_references`。
-查询解析采用 latency-first 参数（`QUERY_LLM_REASONING_EFFORT=minimal`、`QUERY_LLM_MAX_TOKENS=400`、
+查询解析采用 latency-first 参数（默认不设置 `reasoning_effort`、`QUERY_LLM_MAX_TOKENS=400`、
 温度 0、`QUERY_LLM_TIMEOUT_SECONDS=45`、不重试），实测解析通常 1–3 秒；超时或失败会立即退化为
 `raw_intent`，并把 fallback 缓存 `QUERY_FALLBACK_CACHE_SECONDS`（默认 6 小时），同一慢查询不会反复阻塞。
-如需更快的解析模型，设置 `QUERY_LLM_MODEL`（不影响标注/评估使用的模型）。已知错误会通过 MCP
+若显式启用 reasoning 后返回空正文，解析器会自动去掉 reasoning 重试一次。如需更快的解析模型，
+设置 `QUERY_LLM_MODEL`（不影响标注/评估使用的模型）。已知错误会通过 MCP
 `is_error=true` 与可读消息返回，不会只显示“执行失败”。
 
 ## 界面预览
@@ -140,6 +142,14 @@ MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 600
 展示重排前后的名次变化、模型分数与场景来源。
 
 ![多书检索的最终重排结果](images/multi-book-rerank-results.png)
+
+### 写作参考与提示词
+
+“写作参考”工作台提供输入框：填写写作需求、细纲上下文与约束后，服务端完成查询改写、多书检索、
+筛选与提示词组装；结果展示可复制的完整提示词、每条参考的原文节选、剧情摘要、文风与推荐原因，
+以及预算与舍弃统计。
+
+![写作参考与提示词拼装](images/assemble-writing-prompt.png)
 
 ### 书籍导入与索引进度
 
@@ -322,7 +332,7 @@ uv run python -m scripts.export_public_fixture --book-ids 10 43 44 86 --database
 | 版本与场景 | `GET /books/{book_id}/versions`、`GET /books/{book_id}/versions/{version}/scenes`、`GET /scenes/{scene_id}` |
 | 单书检索（内部构件） | `POST /books/{book_id}/search`、`POST /books/{book_id}/search/stream` |
 | **多书聚合（主接口）** | `POST /search/multi`、`POST /search/multi/stream` |
-| 写作参考组装 | `POST /assemble` |
+| 写作参考组装 | `POST /assemble`、`POST /assemble/stream` |
 | 组件调试 | `POST /qdrant/collections/{collection}/points/search`、`GET /qdrant/collections/{collection}/points/{point_id}` |
 
 两个 `/stream` 接口返回 NDJSON：`progress` 表示阶段进度，`result.data` 是最终结果，`error.message` 表示失败。完整的 Scene 原文通过数据库详情接口回查；RRF 候选仅携带 `scene_id` 与限长预览。

@@ -76,6 +76,21 @@ def test_service_plans_query_and_assembles_prompt():
     assert result["fragments"] is None
 
 
+def test_service_reports_assembly_progress():
+    events: list[tuple[str, dict]] = []
+    service = WritingReferenceService(FakeRepository(), FakeSearcher(), Settings())
+    service.search(
+        writing_goal="写一段持枪对峙",
+        on_progress=lambda stage, details: events.append((stage, details)),
+    )
+    stages = [stage for stage, _ in events]
+    assert "assembling" in stages
+    assert "assembling_complete" in stages
+    completed = next(details for stage, details in events if stage == "assembling_complete")
+    assert completed["included"] == 1
+    assert completed["prompt_chars"] > 0
+
+
 def test_service_fragments_mode_skips_assembly():
     service = WritingReferenceService(FakeRepository(), FakeSearcher(), Settings())
     result = service.search(writing_goal="写一段对峙", output="fragments")
