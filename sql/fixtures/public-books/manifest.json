@@ -30,16 +30,6 @@
       "collection": "scenes_book_44_v2",
       "file": "qdrant/scenes_book_44_v2.jsonl",
       "sha256": "226b54664f044ecc4f88768d3dff6020a8342fd8440d5b7625c3a4117d3de823"
-    },
-    {
-      "id": 86,
-      "title": "百年孤独",
-      "version": 3,
-      "scenes": 113,
-      "selected_points": 109,
-      "collection": "scenes_book_86_v3",
-      "file": "qdrant/scenes_book_86_v3.jsonl",
-      "sha256": "cb7b13ec5840606e37c3d34b5f4c836f81eb35be232e3aa247fbbde13443b31f"
     }
   ],
   "excluded": [
@@ -52,12 +42,12 @@
   ],
   "postgres": {
     "file": "postgres.sql",
-    "sha256": "fae367bbf3b73e10a646637a0638ba41120e4bfded55971316bb142ed7853930",
+    "sha256": "29186516cc165b8610f5663702acd15df759ef24b69887fe2907cd6c9381e054",
     "rows": {
-      "books": 4,
-      "chapters": 265,
-      "scenes": 339,
-      "token_map": 38853,
+      "books": 3,
+      "chapters": 245,
+      "scenes": 226,
+      "token_map": 22195,
       "tag_vocab": 53
     }
   }

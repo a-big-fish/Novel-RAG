@@ -2,7 +2,7 @@
 
 > 最后更新：2026-11-16（meta 向量重建后重跑）。
 
-运行环境：PostgreSQL `novel_rag`（原 `novel-rag-test-2`，2026-11-16 统一命名）、Qdrant `http://172.16.43.125:6333`。覆盖公开快照中的四本书（含《百年孤独》），共 28 条单书探针 + 4 条多书聚合探针。
+运行环境为本地 PostgreSQL 观察库 `novel_rag` 与 Qdrant。此次历史基线覆盖四本书，共 28 条单书探针和 4 条多书聚合探针。公开快照覆盖其中三本，范围见[数据清单](../sql/fixtures/public-books/manifest.json)。
 
 ## 覆盖书籍
 

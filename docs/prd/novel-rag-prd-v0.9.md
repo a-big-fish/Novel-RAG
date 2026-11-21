@@ -6,7 +6,7 @@
 > 当前阶段：离线拆书索引、单书检索、多书聚合、可选重排、上传与实时观察台均已实现；本版补齐多书顶层契约、云服务/MCP 交付形态、上下文拼接契约，并把检索质量评估扩展到多本书
 
 **文档版本：** v0.9
-**更新日期：** 2026-11-13
+**更新日期：** 2026-11-21
 **上一版本（已归档）：** [`archive/novel-rag-prd-v0.8-2026-09-24.md`](archive/novel-rag-prd-v0.8-2026-09-24.md)
 
 ---
@@ -466,7 +466,7 @@ meta 向量重建的方法、重建前后书内余弦与复现命令见 [`report
 - 探针目标 Scene 由人工按剧情位置指定，属于闭环可用性检查，存在构造偏差。
 - 四路原始 score 不可跨向量空间比较，报告只统计名次与命中。
 - 跨书重排收益尚未建立对照实验，缺少标注数据；重排单次耗时约 144 s。
-- 四本书已包含在公开快照中，但语料仍只有四本；数十本规模的召回质量与延迟尚未验证。
+- 历史检索基线覆盖本地观察库中的四本书。公开快照包含三本可再分发的作品。数十本规模的召回质量与延迟尚未验证。
 - 每本只有 8–109 个可检索 Scene，Hit@5 存在天花板效应，25/28 不能外推。
 - meta 向量重建后书内余弦仍在 0.68–0.73，标签词表 Jaccard 仍为 0.29；词表收敛待做。
 - 多书聚合的"书籍覆盖 4/4"由轮流汇集策略保证，不能当作相关性质量指标。
@@ -498,7 +498,7 @@ meta 向量重建的方法、重建前后书内余弦与复现命令见 [`report
 ```bash
 APP_VERSION=0.9.0
 
-# 观察库（已含四本解析完成的书；第三方接入无需重新索引）
+# 本地观察库。新建库需先导入公开快照或索引自有作品
 POSTGRES_DB=novel_rag
 POSTGRES_TEST_DB=novel_rag_test
 
@@ -524,7 +524,7 @@ RERANK_ENABLED=false
 RERANK_TOP_N=10
 RERANK_CONCURRENCY=1
 
-# 组装（计划实现）
+# 写作参考组装
 ASSEMBLY_BUDGET_CHARS=6000
 ASSEMBLY_MAX_SCENES=8
 ASSEMBLY_PER_SCENE_CHARS=1200
@@ -590,7 +590,7 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 
 ### 13.3 重排的定位与优化
 
-实测重排 5 条候选耗时约 138.6 s（Qwen3-Reranker-4B，本机 Ollama）。结论：
+四书基线的重排探针处理 5 条候选用时约 144 秒，模型为 Qwen3-Reranker-4B。[实测记录](../../reports/retrieval-baseline-multi-book-2026-11-13.md)
 
 - **重排天生高耗时，不作为实时写作工作流的一部分**；它是离线/半离线精排、批量评估与人工审核辅助。
 - 默认链路使用聚合顺序；调用方可显式请求重排，或读取后台预计算的重排结果。
@@ -599,7 +599,7 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 
 ### 13.4 数据边界与公开快照
 
-- 公开仓库分发**四本书快照**（马之途、备用联系人、切勿操之过急、百年孤独）及其衍生标注与向量；不包含原始 EPUB/TXT。
+- 公开仓库分发《马之途》《备用联系人》《切勿操之过急》的快照。《百年孤独》用于本地检索基线与界面示例。公开数据范围见[作品数据说明](../../sql/fixtures/public-books/NOTICE.md)。
 - 作品数据不适用代码的 MIT 许可；权利人如有异议，按 `NOTICE.md` 的 takedown 流程处理，可用导出脚本重新生成快照替换。
 - 检索与观察接口一律只读，不借由看板或 MCP 删除、重建或切换索引版本。
 
@@ -620,7 +620,7 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 | **I（M2）** | **stdio MCP：以写作目标为主入口，附组装 skill 与使用说明** | 已完成第一版 |
 | J（M3） | 长任务可靠性：in-process worker + PG 队列/租约/重试/checkpoint | in-process 已实现；独立进程与取消 UI 待做 |
 | K（M4） | meta 标注与词表整改、路由形态评估，并回归多书基线 | 查询锚点 + 向量重建已完成；词表收敛待做 |
-| L（M5） | 四书公开快照 | 本版完成导出 |
+| L（M5） | 三书公开快照 | 已提供 PostgreSQL 与 Qdrant 导入数据 |
 | M | 云服务器 / 托管云形态 | 未来，暂不启动（当前用本机 + Cloudflare Tunnel） |
 | N | 个人摘抄库、写作质量标注 | 未来，不着急 |
 | O | CI 与独立测试库（见 §13.2 之外的工程保障） | 按需，后续 |
@@ -655,5 +655,5 @@ ASSEMBLY_TEMPLATE_VERSION=assembly-v1
 
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
-| v0.9 | 2026-11-16 | 多书聚合升为最高层接口；交付形态改为本机 + Cloudflare Tunnel，云服务列为未来可能实现；MCP 与组装层（prompt 可用）落地；meta 风格签名与向量重建；**索引长任务可靠性改为 PostgreSQL 队列 + in-process worker（租约/重试/checkpoint，无中间件）**；四书公开快照 |
+| v0.9 | 2026-11-21 | 多书聚合升为最高层接口；交付形态改为本机 + Cloudflare Tunnel，云服务列为未来可能实现；MCP 与组装层（prompt 可用）落地；meta 风格签名与向量重建；**索引长任务可靠性改为 PostgreSQL 队列 + in-process worker（租约/重试/checkpoint，无中间件）**；三书公开快照与本地四书基线 |
 | v0.8 | 2026-09-24 | 单书检索、观察台、Reference Evaluation 定稿（[归档](archive/novel-rag-prd-v0.8-2026-09-24.md)） |

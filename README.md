@@ -4,7 +4,7 @@
 
 **Novel-RAG** 是小说创作项目 **novel-creator** 的基础能力之一，也可以独立部署为小说理解与写作范本检索服务。
 
-当前版本：**0.9.0**。最新方案见 [`docs/prd/novel-rag-prd-v0.9.md`](docs/prd/novel-rag-prd-v0.9.md)；v0.8 已归档。
+当前软件版本为 **0.9.0**。需求版本、数据库迁移和评测报告见[文档索引](docs/README.md)。
 
 ## 愿景
 
@@ -75,10 +75,8 @@ MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 600
 
 前置条件：
 
-1. `.env` 已配置 PostgreSQL、Qdrant、Ollama 与可用的 LLM，并执行迁移
-   `007_index_job_queue.sql`。本机默认观察库 `novel_rag` **已经包含四本解析完成的书**
-   （含《百年孤独》），可直接检索；只有新建库才需要导入快照或重新索引。
-   可用 `list_books` 或 `get_service_status` 检查。
+1. 在 `.env` 配置 PostgreSQL、Qdrant、Ollama 和 LLM，并完成下文的[数据库迁移](#本机开发)。
+   新建数据库需要先[导入公开测试库](#导入公开测试库)或索引自有书籍。可用 `list_books` 和 `get_service_status` 确认。
 2. 本机有 `uv`，或直接使用仓库的 `.venv`。
 3. MCP 走 stdio，由客户端进程拉起，不需要公网端口，也没有额外鉴权；跨机使用需要远程
    MCP 桥接或隧道（以后可能的实现）。
@@ -121,6 +119,21 @@ MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 600
 设置 `QUERY_LLM_MODEL`（不影响标注/评估使用的模型）。已知错误会通过 MCP
 `is_error=true` 与可读消息返回，不会只显示“执行失败”。
 
+## RAG 写作对照结果
+
+在 2026 年 11 月 20 日的 Oh Story 写作测试中，四组按相同的场景任务各写了两篇终稿，覆盖「排练厅首次弹琴」和「团部三人戏」。DeepSeek 和 GPT 分别评审了八篇终稿。
+
+**在这批测试里，使用 RAG 的终稿多数得分更高。** 按同场景、同评审与无 RAG 的 A 组逐一比较，B、C、D 三组在 **12 次对比中领先 10 次**。C 组领先 4 次，B 组和 D 组各领先 3 次。两次例外都出现在团部场，GPT 更认可 A 组的工期安排和执行逻辑。
+
+| 场景 | 评审 | A · 无 RAG | B · 子 Agent 代写 | C · 子 Agent 整理 | D · 本地范本 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 排练厅首次弹琴 | DeepSeek / 10 | 8.3 | 8.8 | **8.9** | 8.5 |
+| 排练厅首次弹琴 | GPT / 100 | 79 | 87 | **89** | 80 |
+| 团部三人戏 | DeepSeek / 10 | 8.2 | 8.7 | **9.0** | 8.5 |
+| 团部三人戏 | GPT / 100 | 83 | 81 | **86** | 77 |
+
+这批结果仅覆盖两个场景，每组在每个场景只生成了一稿，尚无真人盲评。团部场的 C 组由主 Agent 接管检索并直接读原文，因此该场得分反映的是实际完成的工作流。RAG 的收益能否跨场景、跨生成轮次复现，仍需验证。
+
 ## 界面预览
 
 ### 场景与标注观察
@@ -129,7 +142,7 @@ MCP 默认不重排（`use_rerank=false`）；`prompt` 的字符预算默认 600
 
 ![《百年孤独》索引观察首页，展示场景目录、入选统计与标签分布](images/one-hundred-years-of-solitude-index-overview.png)
 
-这次本地索引生成 **20 章、113 个 Scene**；其中 **109 个入选参考、4 个归档、0 个评估失败**，PostgreSQL 与 Qdrant 的入选索引数量均为 **109**。这些是本地版本 v3 的观察结果，用于展示切分与索引效果；《百年孤独》的原文、标注和向量**已包含**在下方四本书测试库中。
+《百年孤独》本地索引 v3 包含 **20 章、113 个 Scene**，其中 **109 个入选、4 个归档、0 个评估失败**。PostgreSQL 与 Qdrant 的入选数均为 **109**。此处展示本地索引效果。
 
 ### 多书检索实验
 
@@ -211,8 +224,7 @@ Rerank 仅在检索时按配置执行；未开启时直接返回聚合排序结�
 - 首次启动会下载 Embedding 模型；开启重排时还会下载 Reranker。模型下载和推理需要足够的磁盘、内存与算力，CPU 可运行但会较慢。
 - 当前 API 没有用户认证。Compose 默认只将服务端口绑定到 `127.0.0.1`；对公网开放前须自行加访问控制。
 - 公网访问当前采用**本机 + Cloudflare Tunnel（或同类内网穿透）**，不租赁服务器；云服务器/托管云服务是以后可能的实现。隧道只转发应用 HTTP，启用前必须配置 Cloudflare Access、API Key 或反向代理鉴权，且不要暴露 PostgreSQL/Qdrant/Ollama 端口。
-- 本机默认数据库为观察库 `novel_rag`（已含四本解析完成的书）；测试库为独立的 `novel_rag_test`。生产部署另建库并在迁移后导入或重新索引书籍。
-- stdio MCP 交付形态是 v0.9 的实现重点，但工具集合与调用粒度尚未定型；当前对外入口为 HTTP API。
+- 默认 PostgreSQL 数据库名为 `novel_rag`。集成测试使用独立的 `novel_rag_test`。
 
 ### Docker Compose 启动
 
@@ -242,7 +254,7 @@ uv run python -m app.db.migrate migrations/007_index_job_queue.sql
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-`POSTGRES_DB` 指向需要初始化的数据库；本机默认使用观察库 `novel_rag`，其中已包含四本解析完成的书与本地索引的《百年孤独》，第三方接入无需重新索引。`POSTGRES_TEST_DB` 使用独立的 `novel_rag_test`，集成测试不会污染观察数据。Windows PowerShell 中将 `cp` 换成 `Copy-Item` 即可。真实密钥只放在本机 `.env`，不要提交。
+`POSTGRES_DB` 指向目标数据库，默认名为 `novel_rag`。迁移建立数据库结构，书目通过恢复快照或索引写入。集成测试使用 `POSTGRES_TEST_DB`。Windows PowerShell 可用 `Copy-Item` 复制配置模板。
 
 场景边界判断会按模型、提示词版本与输入内容缓存到 PostgreSQL；长篇索引中断后可复用已完成窗口。`SCENE_MIN_CHARS` 控制接受模型边界的最小场景长度。升级旧版本后，已有书籍需重新索引才能采用新的 EPUB 章节与场景切分结果。
 
@@ -261,66 +273,40 @@ INDEX_WORKER_ENABLED=true
 
 重复上传按文件 SHA-256 或相同书名与作者识别；未确认时返回现有书籍与下一版本号，不改动登记记录。确认后替换该书用于下一轮索引的源文件并启动索引；旧版 Scene 与向量仍按版本保留。版本号由当前版本递增，因此已有 v2 的书下一轮会生成 v3。
 
-## 四本书测试库
+## 数据与检索基线
 
-`sql/fixtures/public-books/` 是可恢复的多书检索样本，保存四本已获授权的公开测试作品在 2026 年 11 月 13 日导出的当前索引版本。本地后续重新索引不会自动写回这份快照：
+### 公开测试库
 
-| 书名 | book_id | version | Scene | Qdrant 入选点 |
+[公开快照](sql/fixtures/public-books/)用于部署演示，包含三本获授权的作品，共 **245 章、226 个 Scene、151 个 Qdrant 入选点**。这批数据源自 2026 年 11 月 13 日的索引快照，2026 年 11 月 21 日按公开授权范围整理。
+
+| 书名 | Book ID | 索引版本 | Scene | Qdrant 入选点 |
 | --- | ---: | ---: | ---: | ---: |
-| 马之途 | 10 | 3 | 9 | 8 |
-| 备用联系人 | 43 | 2 | 88 | 54 |
-| 切勿操之过急 | 44 | 2 | 129 | 89 |
-| 百年孤独 | 86 | 3 | 113 | 109 |
+| 马之途 | 10 | v3 | 9 | 8 |
+| 备用联系人 | 43 | v2 | 88 | 54 |
+| 切勿操之过急 | 44 | v2 | 129 | 89 |
 
-`postgres.sql` 包含书籍登记、章节全文、Scene 原文与标注、标签词表和稀疏词映射；`qdrant/*.jsonl` 包含对应向量和场景元数据。`manifest.json` 记录版本、行数、点数及 SHA-256。**原始 EPUB/TXT 未包含在快照中**；恢复后可以检索、浏览，若要重新索引请通过 Dashboard 重新上传原文件。
+PostgreSQL SQL 包含登记、章节、场景、标注、标签词表及稀疏词映射。Qdrant JSONL 包含对应向量与场景元数据。[数据清单](sql/fixtures/public-books/manifest.json)记录版本、行数、点数和校验值。[作品数据说明](sql/fixtures/public-books/NOTICE.md)列出公开范围、包含与排除的数据及权利联系渠道。项目代码采用 [MIT 许可证](LICENSE)。
 
-快照不包含 API 密钥、查询历史、模型输入缓存、Embedding 缓存或索引任务日志。本机 `source_path` 已替换为占位路径。不要把个人数据库直接 `pg_dump` 后提交到公开仓库。作品数据的权利说明与 takedown 流程见 [`sql/fixtures/public-books/NOTICE.md`](sql/fixtures/public-books/NOTICE.md)。
+### 导入公开测试库
 
-### 检索质量基线
-
-- 多书规模化基线（含《百年孤独》，4 本书、28 条单书探针 + 4 条多书聚合探针）：[`reports/retrieval-baseline-multi-book-2026-11-13.md`](reports/retrieval-baseline-multi-book-2026-11-13.md)。单书 RRF Hit@5 为 28/28；剧情摘要 28/28、原文语义 27/28、风格与技法 25/28；多书聚合 4/4 查询成功并覆盖全部书单书籍，平均约 4.2 s；解析降级 0。
-- 风格与技法路由诊断（查询构造 + 向量空间塌缩证据）：[`reports/meta-route-diagnosis-2026-11-13.md`](reports/meta-route-diagnosis-2026-11-13.md)。查询锚点修复把命中从 9/28 提到 24/28。
-- meta 向量重建（260 个场景、0 失败，书内余弦 0.81→0.69）：[`reports/meta-vector-rebuild-2026-11-16.md`](reports/meta-vector-rebuild-2026-11-16.md)。重建后该路由 25/28，RRF 28/28。
-- 早期单书基线（《马之途》10 条探针）：[`reports/archive/retrieval-baseline-ma-zhitu-2026-09-29.md`](reports/archive/retrieval-baseline-ma-zhitu-2026-09-29.md)。
-
-可选重排在 5 条候选上耗时约 144 s，且重排本身是高耗时任务，暂不进入实时写作链路；优化方向（分数缓存、后台预计算、超时回退）见 PRD §13.3。
-
-复现：
-
-```bash
-uv run python -B -m tests.real.run_retrieval_baseline
-```
-
-meta 向量重建（风格签名 → 只重嵌入 `meta-dense`，幂等）：
-
-```bash
-uv run python -B -m scripts.rebuild_meta_vectors --book-ids 10 43 44 86 --workers 10
-```
-
-在全新 Compose 数据卷中启动并完成迁移后导入：
+在全新 Compose 环境完成迁移后执行下列命令。目标 PostgreSQL 项目库应为空，Qdrant 中应没有同名 collection。
 
 ```bash
 docker compose exec app python -m scripts.restore_public_postgres sql/fixtures/public-books
 docker compose exec app python -m scripts.restore_public_qdrant sql/fixtures/public-books
 ```
 
-导入脚本要求目标 Qdrant 中不存在同名 Collection；SQL 也应仅导入到空的项目库。成功后访问 Dashboard，或提交多书检索：
+导入后可在 Dashboard 查看三本书，或向多书检索接口提交以下请求。
 
 ```json
-{"query":"寻找人物关系紧张、对话带有试探意味的场景","book_ids":[10,43,44,86],"per_book_limit":20,"global_limit":50}
+{"query":"寻找人物关系紧张、对话带有试探意味的场景","book_ids":[10,43,44],"per_book_limit":20,"global_limit":50}
 ```
 
-源快照可由已授权的数据库重新生成：
+### 检索质量基线
 
-```bash
-uv run python -m scripts.export_public_fixture --book-ids 10 43 44 86 --database novel_rag --output sql/fixtures/new-export --confirm-public-rights
-```
+历史四书基线使用本地观察数据，含《百年孤独》。2026 年 11 月 16 日重跑中，28 条单书探针的 RRF Hit@5 为 28/28，剧情摘要 28/28，原文语义 27/28，风格与技法 25/28。4 条聚合探针均成功，平均约 4.2 秒。独立重排探针使用 5 条候选，约 144 秒。这些数字对应当时的语料、模型与硬件。[四书检索基线](reports/retrieval-baseline-multi-book-2026-11-13.md)
 
-### 作品与侵权联系
-
-测试库中的四本作品及其衍生标注仅用于展示小说理解与检索功能，不因代码仓库公开而授予第三方复制、改编或再分发作品的权利。**若权利人认为相关内容侵权，请通过本仓库 Issues 联系维护者；收到通知后会立即处理、删除相关公开测试数据，并处理仓库历史中的相应内容。**
-
-项目代码采用 [MIT 许可证](LICENSE)，作品原文及测试库内容不适用该许可证。仓库主页：[a-big-fish/Novel-RAG](https://github.com/a-big-fish/Novel-RAG)。
+诊断、向量重建和复现条件见[文档索引](docs/README.md#检索报告)。
 
 ## API 文档
 
@@ -361,7 +347,7 @@ images/                 README 展示用的界面截图
 migrations/             PostgreSQL 迁移历史
 reports/                检索质量基线报告与归档
 sql/fixtures/public-books/
-                        四本书的 PostgreSQL 数据 SQL、Qdrant JSONL、校验清单与权利说明
+                        三本书的 PostgreSQL SQL、Qdrant JSONL、校验清单与权利说明
 scripts/                测试库导出与 Qdrant 恢复脚本
 tests/                  单元、集成、手工真实链路与基线脚本
 data/                   本地上传与转换缓存，不进入 Git
